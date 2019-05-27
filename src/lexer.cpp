@@ -2,12 +2,25 @@
 
 const Token Token::Null = { "", "" };
 
+const std::string keywords = " if else true false null ";
+
 namespace lexer {
 	InputStream* input;
 	Token current;
 
+	bool is_keyword(const std::string& str) {
+		return keywords.find(" " + str + " ", 0) != std::string::npos;
+	}
+
 	bool is_whitespace(char ch) {
 		return ch == ' ' || ch == '\t' || ch == '\n';
+	}
+
+	bool is_ident(char ch) {
+		return std::isdigit(ch) || std::isalpha(ch);
+	}
+
+	bool is_punc(char ch) {
 	}
 
 	std::string read_while(bool(*predicate)(char)) {
@@ -18,16 +31,24 @@ namespace lexer {
 		return str.str();
 	}
 
-	void skip_line_comment() {
-		read_while([]() -> bool {
+	Token read_string() {
+	}
 
-		});
+	Token read_number() {
+	}
+
+	Token read_ident() {
+	}
+
+	void skip_line_comment() {
+		read_while([](char ch) -> bool { return ch != '\n'; });
+		input->next();
 	}
 
 	void skip_block_comment() {
-	}
-
-	Token read_string() {
+		read_while([](char ch) -> bool { return ch != '*' || input->peek(2) != '/' });
+		input->next();
+		input->next();
 	}
 
 	Token read_next() {
