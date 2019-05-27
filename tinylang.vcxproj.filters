@@ -33,6 +33,9 @@
     <ClCompile Include="src\fileio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\input.h">
@@ -45,6 +48,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\fileio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ast.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

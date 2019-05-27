@@ -153,6 +153,7 @@
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\lexer.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\parser.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -161,9 +162,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\ast.h" />
     <ClInclude Include="src\fileio.h" />
     <ClInclude Include="src\input.h" />
     <ClInclude Include="src\lexer.h" />
+    <ClInclude Include="src\parser.h" />
     <ClInclude Include="src\pch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

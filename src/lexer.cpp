@@ -21,6 +21,13 @@ namespace lexer {
 	}
 
 	bool is_punc(char ch) {
+		std::string chars = ",;(){}[]";
+		return chars.find(ch) != std::string::npos;
+	}
+
+	bool is_op(char ch) {
+		std::string chars = "+-*/%=&|<>!";
+		return chars.find(ch) != std::string::npos;
 	}
 
 	std::string read_while(bool(*predicate)(char)) {
@@ -31,13 +38,36 @@ namespace lexer {
 		return str.str();
 	}
 
+	std::string read_escaped(char end) {
+		bool esc = false;
+		std::stringstream str;
+		while (!input->eof()) {
+			char ch = input->next();
+			if (esc) {
+				str << ch;
+				esc = false;
+			}
+			else if (ch == '\\')
+				esc = true;
+			else if (ch == end)
+				break;
+			else str << ch;
+		}
+		return str.str();
+	}
+
 	Token read_string() {
+		return { "str", read_escaped('"') };
 	}
 
 	Token read_number() {
+		std::string numstr = read_while([](char ch) -> bool { return std::isdigit(ch); });
+		return { "num", numstr };
 	}
 
 	Token read_ident() {
+		std::string ident = read_while(is_ident);
+		return { is_keyword(ident) ? "kw" : "var", ident };
 	}
 
 	void skip_line_comment() {
@@ -65,10 +95,11 @@ namespace lexer {
 			return read_next();
 		}
 		if (ch == '"') return read_string();
-		if (is_digit(ch)) return read_number();
+		if (std::isdigit(ch)) return read_number();
 		if (is_ident(ch)) return read_ident();
 		if (is_punc(ch)) return { "punc", std::to_string(input->next()) };
-
+		if (is_op(ch)) return { "op", read_while(is_op) };
+		input->error("Can't handle character '" + std::to_string(ch) + "'");
 	}
 
 	Token peek() {

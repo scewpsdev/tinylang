@@ -11,6 +11,7 @@ public:
 	std::string value;
 };
 
+
 namespace lexer {
 	extern InputStream* input;
 
