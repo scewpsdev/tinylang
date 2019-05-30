@@ -11,6 +11,16 @@ public:
 	std::string value;
 };
 
+class Lexer {
+	InputStream input;
+public:
+	Lexer(InputStream input);
+
+	Token peek();
+	Token next();
+	bool eof();
+	void error(const std::string& msg);
+};
 
 namespace lexer {
 	extern InputStream* input;

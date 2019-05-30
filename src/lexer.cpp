@@ -76,7 +76,7 @@ namespace lexer {
 	}
 
 	void skip_block_comment() {
-		read_while([](char ch) -> bool { return ch != '*' || input->peek(2) != '/' });
+		read_while([](char ch) -> bool { return ch != '*' || input->peek(2) != '/';	});
 		input->next();
 		input->next();
 	}
@@ -100,6 +100,7 @@ namespace lexer {
 		if (is_punc(ch)) return { "punc", std::to_string(input->next()) };
 		if (is_op(ch)) return { "op", read_while(is_op) };
 		input->error("Can't handle character '" + std::to_string(ch) + "'");
+		return Token::Null;
 	}
 
 	Token peek() {
@@ -111,4 +112,33 @@ namespace lexer {
 		current = Token::Null;
 		return tok.type != "" ? tok : read_next();
 	}
+
+	bool eof() {
+		return peek().type != "";
+	}
+
+	void error(const std::string & msg) {
+		input->error(msg);
+	}
+}
+
+Lexer::Lexer(InputStream input)
+	: input(input) {
+	lexer::input = &this->input;
+}
+
+Token Lexer::peek() {
+	return lexer::peek();
+}
+
+Token Lexer::next() {
+	return lexer::next();
+}
+
+bool Lexer::eof() {
+	return lexer::eof();
+}
+
+void Lexer::error(const std::string msg) {
+	lexer::error(msg);
 }
