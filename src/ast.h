@@ -1,7 +1,5 @@
 #pragma once
 
-#include "pch.h"
-
 class Expression {
 public:
 	std::string type;
@@ -14,98 +12,132 @@ class Number : public Expression {
 public:
 	int value;
 public:
-	Number(std::string type, int value)
-		: Expression(type), value(value) {}
+	Number(int value)
+		: Expression("num"), value(value) {}
 };
 
 class String : public Expression {
 public:
 	std::string value;
 public:
-	String(std::string type, std::string value)
-		: Expression(type), value(value) {}
+	String(std::string value)
+		: Expression("str"), value(value) {}
 };
 
 class Boolean : public Expression {
 public:
 	bool value;
 public:
-	Boolean(std::string type, bool value)
-		: Expression(type), value(value) {}
+	Boolean(bool value)
+		: Expression("bool"), value(value) {}
 };
 
 class Identifier : public Expression {
 public:
 	std::string value;
 public:
-	Identifier(std::string type, std::string value)
-		: Expression(type), value(value) {}
+	Identifier(std::string value)
+		: Expression("var"), value(value) {}
 };
 
 class Closure : public Expression {
 public:
 	std::vector<std::string> args;
-	class AST body;
+	Expression* body;
 public:
-	Closure(std::string type, std::vector<std::string> args, AST body)
-		: Expression(type), args(args), body(body) {}
+	Closure(std::vector<std::string> args, Expression* body)
+		: Expression("cls"), args(args), body(body) {}
+	~Closure() {
+		delete body; body = nullptr;
+	}
 };
 
 class Call : public Expression {
 public:
-	Expression func;
-	std::vector<Expression> args;
+	Expression* func;
+	std::vector<Expression*> args;
 public:
-	Call(std::string type, Expression func, std::vector<Expression> args)
-		: Expression(type), func(func), args(args) {}
+	Call(Expression* func, std::vector<Expression*> args)
+		: Expression("call"), func(func), args(args) {}
+	~Call() {
+		delete func; func = nullptr;
+		for (int i = 0; i < args.size(); i++) {
+			delete args[i];
+			args[i] = nullptr;
+		}
+	}
 };
 
 class If : public Expression {
 public:
-	Expression cond;
-	Expression then;
-	Expression els;
+	Expression* cond;
+	Expression* then;
+	Expression* els;
 public:
-	If(std::string type, Expression cond, Expression then, Expression els)
-		: Expression(type), cond(cond), then(then), els(els) {}
+	If(Expression* cond, Expression* then, Expression* els)
+		: Expression("if"), cond(cond), then(then), els(els) {}
+	~If() {
+		delete cond; cond = nullptr;
+		delete then; then = nullptr;
+		if (els) {
+			delete els; els = nullptr;
+		}
+	}
 };
 
 class Assign : public Expression {
 public:
 	std::string op;
-	Expression left;
-	Expression right;
+	Expression* left;
+	Expression* right;
 public:
-	Assign(std::string type, std::string op, Expression left, Expression right)
-		: Expression(type), op(op), left(left), right(right) {}
+	Assign(std::string op, Expression* left, Expression* right)
+		: Expression("assign"), op(op), left(left), right(right) {}
+	~Assign() {
+		delete left; left = nullptr;
+		delete right; right = nullptr;
+	}
 };
 
 class Binary : public Expression {
 public:
 	std::string op;
-	Expression left;
-	Expression right;
+	Expression* left;
+	Expression* right;
 public:
-	Binary(std::string type, std::string op, Expression left, Expression right)
-		: Expression(type), op(op), left(left), right(right) {}
-};
-
-class Program : public Expression {
-public:
-	class AST prog;
-public:
-	Program(std::string type, AST prog)
-		: Expression(type), prog(prog) {}
+	Binary(std::string op, Expression* left, Expression* right)
+		: Expression("binary"), op(op), left(left), right(right) {}
+	~Binary() {
+		delete left; left = nullptr;
+		delete right; right = nullptr;
+	}
 };
 
 class AST {
 public:
-	std::vector<Expression> vars;
-	class AST* body;
+	std::vector<Expression*> vars;
 public:
 	AST() {}
-	AST(std::vector<Expression> vars) : vars(vars) {}
-	inline void push(Expression expr) {
+	AST(std::vector<Expression*> vars) : vars(vars) {}
+	~AST() {
+		for (int i = 0; i < vars.size(); i++) {
+			delete vars[i];
+			vars[i] = nullptr;
+		}
+	}
+
+	inline void push(Expression* expr) {
 		vars.push_back(expr);
+	}
+};
+
+class Program : public Expression {
+public:
+	AST* ast;
+public:
+	Program(AST* ast)
+		: Expression("prog"), ast(ast) {}
+	~Program() {
+		delete ast; ast = nullptr;
 	}
 };

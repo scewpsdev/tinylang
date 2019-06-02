@@ -1,5 +1,6 @@
+#include "stdafx.h"
+
 #include "input.h"
-#include "pch.h"
 
 InputStream::InputStream(const std::string& input)
 	: input(input) {
@@ -21,10 +22,14 @@ char InputStream::peek(int off) {
 	return input[pos + off];
 }
 
+void InputStream::reset() {
+	pos = 0;
+}
+
 bool InputStream::eof() {
 	return pos >= input.length();
 }
 
 void InputStream::error(const std::string& msg) {
-	std::cerr << msg << " (" << line << ":" << col << ")";
+	std::cerr << "(" << line << ":" << col << ") " << msg << std::endl;
 }

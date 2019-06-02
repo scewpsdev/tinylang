@@ -1,3 +1,5 @@
+#include "stdafx.h"
+
 #include "lexer.h"
 
 const Token Token::Null = { "", "" };
@@ -41,6 +43,7 @@ namespace lexer {
 	std::string read_escaped(char end) {
 		bool esc = false;
 		std::stringstream str;
+		input->next();
 		while (!input->eof()) {
 			char ch = input->next();
 			if (esc) {
@@ -71,12 +74,16 @@ namespace lexer {
 	}
 
 	void skip_line_comment() {
+		input->next();
+		input->next();
 		read_while([](char ch) -> bool { return ch != '\n'; });
 		input->next();
 	}
 
 	void skip_block_comment() {
-		read_while([](char ch) -> bool { return ch != '*' || input->peek(2) != '/';	});
+		input->next();
+		input->next();
+		read_while([](char ch) -> bool { return ch != '*' || input->peek(1) != '/';	});
 		input->next();
 		input->next();
 	}
@@ -85,7 +92,7 @@ namespace lexer {
 		read_while(is_whitespace);
 		if (input->eof()) return Token::Null;
 		char ch = input->peek();
-		char ch2 = input->peek(2);
+		char ch2 = input->peek(1);
 		if (ch == '/' && ch2 == '/') {
 			skip_line_comment();
 			return read_next();
@@ -97,9 +104,9 @@ namespace lexer {
 		if (ch == '"') return read_string();
 		if (std::isdigit(ch)) return read_number();
 		if (is_ident(ch)) return read_ident();
-		if (is_punc(ch)) return { "punc", std::to_string(input->next()) };
+		if (is_punc(ch)) return { "punc", std::string(1, input->next()) };
 		if (is_op(ch)) return { "op", read_while(is_op) };
-		input->error("Can't handle character '" + std::to_string(ch) + "'");
+		input->error("Can't handle character '" + std::string(1, ch) + "'");
 		return Token::Null;
 	}
 
@@ -113,18 +120,21 @@ namespace lexer {
 		return tok.type != "" ? tok : read_next();
 	}
 
-	bool eof() {
-		return peek().type != "";
+	void reset() {
+		input->reset();
 	}
 
-	void error(const std::string & msg) {
+	bool eof() {
+		return peek().type == "";
+	}
+
+	void error(const std::string& msg) {
 		input->error(msg);
 	}
 }
 
-Lexer::Lexer(InputStream input)
-	: input(input) {
-	lexer::input = &this->input;
+Lexer::Lexer(InputStream* input) {
+	lexer::input = input;
 }
 
 Token Lexer::peek() {
@@ -135,10 +145,14 @@ Token Lexer::next() {
 	return lexer::next();
 }
 
+void Lexer::reset() {
+	lexer::reset();
+}
+
 bool Lexer::eof() {
 	return lexer::eof();
 }
 
-void Lexer::error(const std::string msg) {
+void Lexer::error(const std::string& msg) {
 	lexer::error(msg);
 }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "pch.h"
 #include "input.h"
 
 class Token {
@@ -12,12 +11,12 @@ public:
 };
 
 class Lexer {
-	InputStream input;
 public:
-	Lexer(InputStream input);
+	Lexer(InputStream* input);
 
 	Token peek();
 	Token next();
+	void reset();
 	bool eof();
 	void error(const std::string& msg);
 };

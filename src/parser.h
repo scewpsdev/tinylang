@@ -1,13 +1,11 @@
 #pragma once
 
 #include "lexer.h"
+#include "ast.h"
 
 class Parser {
-	Lexer lexer;
 public:
-	Parser(Lexer lexer);
+	Parser(Lexer* lexer);
+
+	AST* parse_toplevel();
 };
-
-namespace parser {
-
-}
