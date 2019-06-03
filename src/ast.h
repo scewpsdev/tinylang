@@ -40,6 +40,24 @@ public:
 		: Expression("var"), value(value) {}
 };
 
+class Parameter {
+public:
+	std::string type;
+	std::string name;
+public:
+	Parameter(const std::string& type, const std::string& name)
+		: type(type), name(name) {}
+};
+
+class Extern : public Expression {
+public:
+	std::string funcname;
+	std::vector<Parameter> args;
+public:
+	Extern(const std::string& funcname, std::vector<Parameter> args)
+		: Expression("ext"), funcname(funcname), args(args) {}
+};
+
 class Closure : public Expression {
 public:
 	std::vector<std::string> args;

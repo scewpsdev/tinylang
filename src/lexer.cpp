@@ -4,7 +4,7 @@
 
 const Token Token::Null = { "", "" };
 
-const std::string keywords = " if else true false null ";
+const std::string keywords = " ext if else true false null ";
 
 namespace lexer {
 	InputStream* input;
@@ -128,12 +128,12 @@ namespace lexer {
 		return peek().type == "";
 	}
 
-	void error(const std::string& msg) {
+	void error(const std::string & msg) {
 		input->error(msg);
 	}
 }
 
-Lexer::Lexer(InputStream* input) {
+Lexer::Lexer(InputStream * input) {
 	lexer::input = input;
 }
 
@@ -153,6 +153,6 @@ bool Lexer::eof() {
 	return lexer::eof();
 }
 
-void Lexer::error(const std::string& msg) {
+void Lexer::error(const std::string & msg) {
 	lexer::error(msg);
 }

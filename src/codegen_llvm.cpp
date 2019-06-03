@@ -20,7 +20,12 @@ namespace codegen {
 	ModuleData* module;
 	CodeBlock* block;
 
-	std::string gen_expr(Expression* expr);
+	llvm::Value* gen_expr(Expression* expr);
+
+	llvm::Type* llvm_type(std::string name) {
+		// TODO
+		return llvm::Type::getInt32Ty(context);
+	}
 
 	std::string arg_list(std::vector<Expression*>& args) {
 		std::stringstream s;
@@ -30,84 +35,98 @@ namespace codegen {
 		return s.str();
 	}
 
-	std::string gen_num(Number* num) {
-		return std::to_string(num->value);
+	llvm::Value* gen_num(Number * num) {
+		return nullptr;
 	}
 
-	std::string gen_str(String* str) {
-		return "";
+	llvm::Value* gen_str(String * str) {
+		return nullptr;
 	}
 
-	std::string gen_bool(Boolean* boolexpr) {
-		return "";
+	llvm::Value* gen_bool(Boolean * boolexpr) {
+		return nullptr;
 	}
 
-	std::string gen_ident(Identifier* ident) {
-		return ident->value;
+	llvm::Value* gen_ident(Identifier * ident) {
+		return nullptr;
 	}
 
-	std::string gen_closure(Closure* cls) {
-		return "";
+	llvm::Value* gen_closure(Closure * cls) {
+		return nullptr;
 	}
 
-	std::string gen_call(Call* call) {
-		return gen_expr(call->func) + "(" + arg_list(call->args) + ")";
+	llvm::Value* gen_call(Call * call) {
+		return nullptr;
 	}
 
-	std::string gen_if(If* ifexpr) {
-		return "";
+	llvm::Value* gen_extern(Extern * ext) {
+		std::vector<llvm::Type*> params;
+		for (int i = 0; i < ext->args.size(); i++) {
+			params.push_back(llvm_type(ext->args[i].type));
+		}
+		llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), params, false);
+		block->func = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, ext->funcname, module->llvmMod);
+		return nullptr;
 	}
 
-	std::string gen_assign(Assign* assign) {
-		return "";
+	llvm::Value* gen_if(If * ifexpr) {
+		return nullptr;
 	}
 
-	std::string gen_binary(Binary* binary) {
-		return "";
+	llvm::Value* gen_assign(Assign * assign) {
+		return nullptr;
 	}
 
-	std::string gen_prog(Program* prog) {
-		return "";
+	llvm::Value* gen_binary(Binary * binary) {
+		return nullptr;
 	}
 
-	std::string gen_expr(Expression* expr) {
+	llvm::Value* gen_prog(Program * prog) {
+		return nullptr;
+	}
+
+	llvm::Value* gen_expr(Expression * expr) {
 		if (expr->type == "prog") return gen_prog((Program*)expr);
 		if (expr->type == "binary") return gen_binary((Binary*)expr);
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
 		if (expr->type == "if") return gen_if((If*)expr);
 		if (expr->type == "call") return gen_call((Call*)expr);
 		if (expr->type == "cls") return gen_closure((Closure*)expr);
+		if (expr->type == "ext") return gen_extern((Extern*)expr);
 		if (expr->type == "var") return gen_ident((Identifier*)expr);
 		if (expr->type == "bool") return gen_bool((Boolean*)expr);
 		if (expr->type == "str") return gen_str((String*)expr);
 		if (expr->type == "num") return gen_num((Number*)expr);
-		return "";
+		return nullptr;
 	}
 
-	void gen_ast(CodeBlock* block, const std::string& name) {
+	void gen_ast(CodeBlock * block, const std::string & name) {
 		codegen::block = block;
 		AST* ast = block->ast;
 
 		std::vector<llvm::Type*> params;
 		llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), params, false);
-		block->func = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, "", module->llvmMod);
+		llvm::Function* func = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, name, module->llvmMod);
 
-		llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, name, block->func);
+		llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", func);
 		builder.SetInsertPoint(entry);
 		llvm::Value* retVal = nullptr;
+		for (int i = 0; i < ast->vars.size(); i++) {
+			gen_expr(ast->vars[i]);
+		}
 
 		builder.CreateRet(llvm::ConstantInt::get(context, llvm::APInt(32, 0)));
 
 		codegen::block = nullptr;
 	}
 
-	void gen_module(std::string name, AST* ast) {
+	void gen_module(std::string name, AST * ast) {
 		module = new ModuleData();
 		module->llvmMod = new llvm::Module(name, context);
 
 		module->blocks.insert(std::make_pair("_" + name + "_init", CodeBlock{ ast }));
 		for (auto& pair : module->blocks) {
-			gen_ast(&pair.second, "main");
+			gen_ast(&pair.second, "mainCRTStartup");
 			llvm::verifyFunction(*pair.second.func);
 		}
 
@@ -179,7 +198,7 @@ namespace codegen {
 		for (std::pair<std::string, AST*> pair : moduleList) {
 			linkCmd << pair.first << ".o ";
 		}
-		linkCmd << "/subsystem:windows /out:a.exe";
+		linkCmd << "/subsystem:console /out:a.exe";
 		system(linkCmd.str().c_str());
 
 		std::cout << "### Test ###" << std::endl;

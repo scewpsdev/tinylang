@@ -27,7 +27,7 @@ namespace parser {
 		return tok.type != "" && tok.type == "kw" && (kw == "" || kw == tok.value);
 	}
 
-	bool is_op(const std::string& op) {
+	bool is_op(const std::string & op) {
 		Token tok = input->peek();
 		return tok.type != "" && tok.type == "op" && (op == "" || tok.value == op);
 	}
@@ -47,7 +47,7 @@ namespace parser {
 		else input->error("Operator '" + op + "' expected");
 	}
 
-	Expression* maybe_binary(Expression* left, int prec) {
+	Expression* maybe_binary(Expression * left, int prec) {
 		if (is_op("")) {
 			Token tok = input->peek();
 			int tokprec = OP_PRECEDENCE.at(tok.value);
@@ -78,14 +78,48 @@ namespace parser {
 		return list;
 	}
 
-	Call* parse_call(Expression* func) {
-		return new Call(func, delimited('(', ')', ',', parse_expr));
+	Boolean* parse_bool() {
+		return new Boolean(input->next().value == "true");
 	}
 
 	std::string parse_varname() {
 		Token name = input->next();
 		if (name.type != "var") input->error("Variable name expected");
 		return name.value;
+	}
+
+	Closure* parse_closure() {
+		return new Closure(delimited('(', ')', ',', parse_varname), parse_prog());
+	}
+
+	Call* parse_call(Expression * func) {
+		return new Call(func, delimited('(', ')', ',', parse_expr));
+	}
+
+	Expression* maybe_call(Expression * (*call)()) {
+		Expression* result = call();
+		return is_punc('(') ? parse_call(result) : result;
+	}
+
+	Parameter parse_param() {
+		std::string type = "";
+		std::string name = "";
+		Token typetok = input->next();
+		type = typetok.value;
+		if (typetok.type != "var") input->error("Type name expected");
+		if (input->peek().type == "var") {
+			Token nametok = input->next();
+			name = nametok.value;
+			if (nametok.type != "var") input->error("Variable name expected");
+		}
+		return Parameter(type, name);
+	}
+
+	Expression* parse_ext() {
+		skip_kw("ext");
+		Token funcname = input->next();
+		if (funcname.type != "var") input->error("Function name expected");
+		return new Extern(funcname.value, delimited('(', ')', ',', parse_param));
 	}
 
 	If* parse_if() {
@@ -100,21 +134,9 @@ namespace parser {
 		return new If(cond, then, els);
 	}
 
-	Closure* parse_closure() {
-		return new Closure(delimited('(', ')', ',', parse_varname), parse_prog());
-	}
-
-	Boolean* parse_bool() {
-		return new Boolean(input->next().value == "true");
-	}
-
-	Expression* maybe_call(Expression* (*call)()) {
-		Expression* result = call();
-		return is_punc('(') ? parse_call(result) : result;
-	}
-
 	Expression* parse_atom() {
 		return maybe_call([]() -> Expression * {
+			if (is_kw("ext")) return parse_ext();
 			if (is_punc('(')) {
 				input->next();
 				Expression* expr = parse_expr();
@@ -160,7 +182,7 @@ namespace parser {
 	}
 }
 
-Parser::Parser(Lexer* lexer) {
+Parser::Parser(Lexer * lexer) {
 	parser::input = lexer;
 }
 
