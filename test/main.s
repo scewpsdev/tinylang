@@ -1,4 +1,4 @@
-ext putchar(i32 Char);
+ext putchar(i32 char);
 
 putchar(99);
 putchar(10);

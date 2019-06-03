@@ -1,5 +1,6 @@
 #pragma once
 
+#include "input.h"
 #include "ast.h"
 
 class Codegen {
