@@ -106,7 +106,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	void gen_ast(CodeBlock* block, const std::string& name) {
+	void gen_ast(CodeBlock * block, const std::string & name) {
 		codegen::block = block;
 		AST* ast = block->ast;
 
@@ -127,7 +127,7 @@ namespace codegen {
 		codegen::block = nullptr;
 	}
 
-	void gen_module(std::string name, AST* ast) {
+	void gen_module(std::string name, AST * ast) {
 		module = new ModuleData();
 		module->llvmMod = new llvm::Module(name, context);
 
