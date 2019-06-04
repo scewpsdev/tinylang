@@ -27,7 +27,7 @@ namespace parser {
 		return tok.type != "" && tok.type == "kw" && (kw == "" || kw == tok.value);
 	}
 
-	bool is_op(const std::string & op) {
+	bool is_op(const std::string& op) {
 		Token tok = input->peek();
 		return tok.type != "" && tok.type == "op" && (op == "" || tok.value == op);
 	}
@@ -47,7 +47,7 @@ namespace parser {
 		else input->error("Operator '" + op + "' expected");
 	}
 
-	Expression* maybe_binary(Expression * left, int prec) {
+	Expression* maybe_binary(Expression* left, int prec) {
 		if (is_op("")) {
 			Token tok = input->peek();
 			int tokprec = OP_PRECEDENCE.at(tok.value);
@@ -92,11 +92,11 @@ namespace parser {
 		return new Closure(delimited('(', ')', ',', parse_varname), parse_prog());
 	}
 
-	Call* parse_call(Expression * func) {
+	Call* parse_call(Expression* func) {
 		return new Call(func, delimited('(', ')', ',', parse_expr));
 	}
 
-	Expression* maybe_call(Expression * (*call)()) {
+	Expression* maybe_call(Expression* (*call)()) {
 		Expression* result = call();
 		return is_punc('(') ? parse_call(result) : result;
 	}
@@ -119,7 +119,7 @@ namespace parser {
 		skip_kw("ext");
 		Token funcname = input->next();
 		if (funcname.type != "var") input->error("Function name expected");
-		return new Extern(funcname.value, delimited('(', ')', ',', parse_param));
+		return new Function(funcname.value, delimited('(', ')', ',', parse_param), nullptr);
 	}
 
 	If* parse_if() {
@@ -182,7 +182,7 @@ namespace parser {
 	}
 }
 
-Parser::Parser(Lexer * lexer) {
+Parser::Parser(Lexer* lexer) {
 	parser::input = lexer;
 }
 

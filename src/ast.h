@@ -49,15 +49,6 @@ public:
 		: type(type), name(name) {}
 };
 
-class Extern : public Expression {
-public:
-	std::string funcname;
-	std::vector<Parameter> args;
-public:
-	Extern(const std::string& funcname, std::vector<Parameter> args)
-		: Expression("ext"), funcname(funcname), args(args) {}
-};
-
 class Closure : public Expression {
 public:
 	std::vector<std::string> args;
@@ -128,6 +119,19 @@ public:
 	~Binary() {
 		delete left; left = nullptr;
 		delete right; right = nullptr;
+	}
+};
+
+class Function : public Expression {
+public:
+	std::string funcname;
+	std::vector<Parameter> params;
+	Expression* body;
+public:
+	Function(const std::string& funcname, std::vector<Parameter> args, Expression* body)
+		: Expression("func"), funcname(funcname), params(args), body(body) {}
+	~Function() {
+		delete body; body = nullptr;
 	}
 };
 
