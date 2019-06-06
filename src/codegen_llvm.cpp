@@ -3,11 +3,6 @@
 #include "codegen.h"
 
 namespace codegen {
-	struct CodeBlock {
-		AST* ast;
-		llvm::Function* func;
-	};
-
 	struct ModuleData {
 		//std::map<std::string, CodeBlock> blocks;
 		std::map<std::string, llvm::Value*> globals;
@@ -19,7 +14,6 @@ namespace codegen {
 
 	std::map<std::string, AST*> moduleList;
 	ModuleData* module;
-	CodeBlock* block;
 
 	llvm::Value* gen_expr(Expression* expr);
 
@@ -76,14 +70,20 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::Value* gen_prog(Program* prog) {
-		for (int i = 0; i < prog->ast->vars.size(); i++) {
-			gen_expr(prog->ast->vars[i]);
+	llvm::Value* gen_ast(AST* ast) {
+		for (int i = 0; i < ast->vars.size(); i++) {
+			gen_expr(ast->vars[i]);
 		}
 		return nullptr;
 	}
 
+	llvm::Value* gen_prog(Program* prog) {
+		gen_ast(prog->ast);
+		return nullptr;
+	}
+
 	llvm::Value* gen_func(Function* func) {
+		llvm::BasicBlock* parentBlock = builder.GetInsertBlock();
 		std::vector<llvm::Type*> params;
 		for (int i = 0; i < func->params.size(); i++) {
 			params.push_back(llvm_type(func->params[i].type));
@@ -99,6 +99,7 @@ namespace codegen {
 			builder.CreateRet(llvm::ConstantInt::get(context, llvm::APInt(32, 0)));
 		}
 		module->llvmMod->getFunctionList().push_back(llvmfunc);
+		builder.SetInsertPoint(parentBlock);
 
 		return nullptr;
 	}
@@ -118,20 +119,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	void gen_ast(CodeBlock* block, const std::string& name) {
-		codegen::block = block;
-		AST* ast = block->ast;
-
-		std::vector<llvm::Type*> params;
-		llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), params, false);
-		llvm::Function* func = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, name, nullptr);
-
-
-
-		codegen::block = nullptr;
-	}
-
-	void gen_module(std::string name, AST* ast) {
+	void gen_module(std::string name, AST * ast) {
 		module = new ModuleData();
 		module->llvmMod = new llvm::Module(name, context);
 
@@ -213,12 +201,12 @@ namespace codegen {
 		for (std::pair<std::string, AST*> pair : moduleList) {
 			linkCmd << "out/" << pair.first << ".o ";
 		}
-		linkCmd << "cstdlib.lib /subsystem:console /out:out/a.exe";
+		linkCmd << "cstdlib.lib /subsystem:console /out:a.exe";
 		//std::cout << linkCmd.str() << std::endl;
 		system(linkCmd.str().c_str());
 
 		std::cout << "### Test ###" << std::endl;
-		system("D:/Projects/sneklang/tinylang/out/a.exe");
+		system("a.exe");
 	}
 }
 

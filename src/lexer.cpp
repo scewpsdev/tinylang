@@ -4,7 +4,7 @@
 
 const Token Token::Null = { "", "" };
 
-const std::string keywords = " ext if else true false null ";
+const std::string keywords = " ext def if else true false null ";
 
 namespace lexer {
 	InputStream* input;

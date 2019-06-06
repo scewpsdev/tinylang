@@ -27,7 +27,7 @@ namespace parser {
 		return tok.type != "" && tok.type == "kw" && (kw == "" || kw == tok.value);
 	}
 
-	bool is_op(const std::string& op) {
+	bool is_op(const std::string & op) {
 		Token tok = input->peek();
 		return tok.type != "" && tok.type == "op" && (op == "" || tok.value == op);
 	}
@@ -47,7 +47,7 @@ namespace parser {
 		else input->error("Operator '" + op + "' expected");
 	}
 
-	Expression* maybe_binary(Expression* left, int prec) {
+	Expression* maybe_binary(Expression * left, int prec) {
 		if (is_op("")) {
 			Token tok = input->peek();
 			int tokprec = OP_PRECEDENCE.at(tok.value);
@@ -92,13 +92,25 @@ namespace parser {
 		return new Closure(delimited('(', ')', ',', parse_varname), parse_prog());
 	}
 
-	Call* parse_call(Expression* func) {
+	Call* parse_call(Expression * func) {
 		return new Call(func, delimited('(', ')', ',', parse_expr));
 	}
 
-	Expression* maybe_call(Expression* (*call)()) {
+	Expression* maybe_call(Expression * (*call)()) {
 		Expression* result = call();
 		return is_punc('(') ? parse_call(result) : result;
+	}
+
+	If* parse_if() {
+		skip_kw("if");
+		Expression* cond = parse_expr();
+		Expression* then = parse_expr();
+		Expression* els = nullptr;
+		if (is_kw("else")) {
+			input->next();
+			els = parse_expr();
+		}
+		return new If(cond, then, els);
 	}
 
 	Parameter parse_param() {
@@ -122,21 +134,20 @@ namespace parser {
 		return new Function(funcname.value, delimited('(', ')', ',', parse_param), nullptr);
 	}
 
-	If* parse_if() {
-		skip_kw("if");
-		Expression* cond = parse_expr();
-		Expression* then = parse_expr();
-		Expression* els = nullptr;
-		if (is_kw("else")) {
-			input->next();
-			els = parse_expr();
-		}
-		return new If(cond, then, els);
+	Expression* parse_func() {
+		input->next();
+		Token tok = input->next();
+		std::string funcname = tok.value;
+		std::vector<Parameter> params;
+		if (is_punc('(')) params = delimited('(', ')', ',', parse_param);
+		Expression* body = parse_expr();
+		return new Function(funcname, params, body);
 	}
 
 	Expression* parse_atom() {
 		return maybe_call([]() -> Expression * {
 			if (is_kw("ext")) return parse_ext();
+			if (is_kw("def")) return parse_func();
 			if (is_punc('(')) {
 				input->next();
 				Expression* expr = parse_expr();
@@ -182,7 +193,7 @@ namespace parser {
 	}
 }
 
-Parser::Parser(Lexer* lexer) {
+Parser::Parser(Lexer * lexer) {
 	parser::input = lexer;
 }
 

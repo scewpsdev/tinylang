@@ -1,8 +1,8 @@
 ext putchar(i32 char);
 
-func {
-	putchar(101);
-}
+def func(i32 arg) {
+	putchar(arg);
+};
 
 func();
 putchar(99);
