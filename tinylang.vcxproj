@@ -155,7 +155,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="test\main.s" />
-    <None Include="test\test.s" />
+    <None Include="test\main.sn" />
+    <None Include="test\syntax.sn" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\codegen_llvm.cpp" />

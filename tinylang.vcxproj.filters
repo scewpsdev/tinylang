@@ -15,8 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="test\test.s" />
     <None Include="test\main.s" />
+    <None Include="test\syntax.sn" />
+    <None Include="test\main.sn" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\input.cpp">

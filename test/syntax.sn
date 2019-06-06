@@ -1,0 +1,57 @@
+// This is a line comment
+/*
+	This is a block comment
+*/
+imp cmd
+imp file
+imp string
+imp array
+
+cmd.write(a = null)
+cmd.write(b = 5)
+cmd.write(c = "hello world")
+cmd.write(d = true)
+cmd.write(e = 'c')
+cmd.write(f = [a, b, c, d, e])
+b = 5
+abc = {
+	cmd.write(b)
+}
+cmd.write(4)
+abc()
+
+content = file.read("input.txt")
+numbers = toInt(string.split(content, "\n"))
+file.write("output.txt", numbers)
+cmd.write(sum = array.sum(numbers))
+cmd.write(var = sum < 562 ? {
+	cmd.write("a")
+	ret 3
+} : {
+	cmd.write("b")
+	ret 5
+})
+
+sum = i = 0
+while i < numbers.length {
+	i %= numbers.length
+	sum += numbers[i++]
+}
+cmd.write(sum)
+
+l = 6
+r = 3
+cmd.write(l + r)
+cmd.write(l - r)
+cmd.write(l * r)
+cmd.write(l / r)
+cmd.write(l % r)
+cmd.write(l == r)
+cmd.write(l < r)
+cmd.write(l <= r)
+cmd.write(l > r)
+cmd.write(l >= r)
+cmd.write(l && r)
+cmd.write(l || r)
+
+cmd.write("---")

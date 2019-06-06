@@ -1,9 +1,14 @@
+// This is a line comment
+/*
+	This is a block comment
+*/
+
 ext putchar(i32 char);
 
 def func(i32 arg) {
 	putchar(arg);
 };
 
-func();
+func(num = 102);
 putchar(99);
 putchar(10);

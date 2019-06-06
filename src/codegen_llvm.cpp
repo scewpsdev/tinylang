@@ -7,6 +7,12 @@ namespace codegen {
 		//std::map<std::string, CodeBlock> blocks;
 		std::map<std::string, llvm::Value*> globals;
 		llvm::Module* llvmMod;
+		llvm::Function* llvmFunc;
+	};
+	struct CodeBlock {
+		CodeBlock* parent;
+		std::map<std::string, llvm::AllocaInst*> locals;
+		CodeBlock(CodeBlock* parent) : parent(parent) {}
 	};
 
 	llvm::LLVMContext context;
@@ -14,12 +20,44 @@ namespace codegen {
 
 	std::map<std::string, AST*> moduleList;
 	ModuleData* module;
+	CodeBlock* block;
 
 	llvm::Value* gen_expr(Expression* expr);
 
+	llvm::Value* rval(llvm::Value* val) {
+		if (val->getType()->isPointerTy()) {
+			return builder.CreateLoad(val);
+		}
+		return val;
+	}
+
 	llvm::Type* llvm_type(std::string name) {
 		// TODO
-		return llvm::Type::getInt32Ty(context);
+		if (name == "i32") {
+			return llvm::Type::getInt32Ty(context);
+		}
+		return nullptr;
+	}
+
+	llvm::Value* cast(llvm::Value* val, llvm::Type* type) {
+		// TODO
+		return val;
+	}
+
+	llvm::Value* find_var(const std::string& name, CodeBlock* block) {
+		if (!block) return nullptr;
+		if (block->locals.count(name)) return block->locals[name];
+		if (llvm::Value * val = find_var(name, block->parent)) return val;
+		if (module->globals.count(name)) return module->globals[name];
+		return nullptr;
+	}
+
+	llvm::AllocaInst* alloc_var(const std::string& name, llvm::Type* type) {
+		llvm::BasicBlock* entry = &module->llvmFunc->getEntryBlock();
+		llvm::IRBuilder<> builder(entry, entry->begin());
+		llvm::AllocaInst* alloc = builder.CreateAlloca(type, nullptr, name);
+		block->locals.insert(std::make_pair(name, alloc));
+		return alloc;
 	}
 
 	llvm::Value* gen_num(Number* num) {
@@ -35,9 +73,7 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_ident(Identifier* ident) {
-		// Global
-		if (module->globals.count(ident->value)) return module->globals[ident->value];
-		return nullptr;
+		return find_var(ident->value, block);
 	}
 
 	llvm::Value* gen_closure(Closure* cls) {
@@ -45,17 +81,19 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_call(Call* call) {
+		// Cast
+		if (call->func->type == "var" && call->args.size() == 1) {
+			if (llvm::Type * type = llvm_type(((Identifier*)call->func)->value)) {
+				return cast(gen_expr(call->args[0]), type);
+			}
+		}
+		// Function call
 		llvm::Value* callee = gen_expr(call->func);
-		//if (funcExpr->getType()->isFunctionTy()) {
-			//llvm::Function* func = static_cast<llvm::Function*>(funcExpr);
 		std::vector<llvm::Value*> args;
 		for (int i = 0; i < call->args.size(); i++) {
-			args.push_back(gen_expr(call->args[i]));
+			args.push_back(rval(gen_expr(call->args[i])));
 		}
-		builder.CreateCall(callee, args);
-		//}
-		// TODO ERROR
-		return nullptr;
+		return builder.CreateCall(callee, args);
 	}
 
 	llvm::Value* gen_if(If* ifexpr) {
@@ -63,7 +101,18 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_assign(Assign* assign) {
-		return nullptr;
+		llvm::Value* left = gen_expr(assign->left);
+		llvm::Value* right = gen_expr(assign->right);
+		if (!left) {
+			if (assign->left->type == "var") {
+				left = alloc_var(((Identifier*)assign->left)->value, right->getType());
+			}
+			else {
+				// TODO ERROR
+			}
+		}
+		builder.CreateStore(right, left, false);
+		return right;
 	}
 
 	llvm::Value* gen_binary(Binary* binary) {
@@ -71,35 +120,55 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_ast(AST* ast) {
+		CodeBlock* parent = block;
+		block = new CodeBlock(parent);
 		for (int i = 0; i < ast->vars.size(); i++) {
 			gen_expr(ast->vars[i]);
 		}
+		delete block;
+		block = parent;
 		return nullptr;
 	}
 
 	llvm::Value* gen_prog(Program* prog) {
-		gen_ast(prog->ast);
-		return nullptr;
+		return gen_ast(prog->ast);
 	}
 
 	llvm::Value* gen_func(Function* func) {
-		llvm::BasicBlock* parentBlock = builder.GetInsertBlock();
 		std::vector<llvm::Type*> params;
 		for (int i = 0; i < func->params.size(); i++) {
 			params.push_back(llvm_type(func->params[i].type));
 		}
 		llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), params, false);
-		llvm::Function* llvmfunc = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, func->funcname, nullptr);
+		llvm::Function* llvmfunc = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, func->funcname, module->llvmMod);
 		module->globals.insert(std::make_pair(func->funcname, llvmfunc));
-
+		int i = 0;
+		for (llvm::Argument& arg : llvmfunc->args()) {
+			arg.setName(func->params[i++].name);
+		}
 		if (func->body) {
+			llvm::BasicBlock* parentBlock = builder.GetInsertBlock();
+			llvm::Function* parentFunc = module->llvmFunc;
+			module->llvmFunc = llvmfunc;
+
+			CodeBlock* parent = block;
+			block = new CodeBlock(parent);
+			for (llvm::Argument& arg : llvmfunc->args()) {
+				block->locals.insert(std::make_pair((std::string)arg.getName(), (llvm::AllocaInst*) & arg));
+			}
+
 			llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", llvmfunc);
 			builder.SetInsertPoint(entry);
+
 			gen_expr(func->body);
 			builder.CreateRet(llvm::ConstantInt::get(context, llvm::APInt(32, 0)));
+
+			delete block;
+			block = parent;
+
+			module->llvmFunc = parentFunc;
+			builder.SetInsertPoint(parentBlock);
 		}
-		module->llvmMod->getFunctionList().push_back(llvmfunc);
-		builder.SetInsertPoint(parentBlock);
 
 		return nullptr;
 	}
@@ -119,18 +188,11 @@ namespace codegen {
 		return nullptr;
 	}
 
-	void gen_module(std::string name, AST * ast) {
+	void gen_module(std::string name, AST* ast) {
 		module = new ModuleData();
 		module->llvmMod = new llvm::Module(name, context);
 
-		//module->blocks.insert(std::make_pair("_" + name + "_init", CodeBlock{ ast }));
-		//for (auto& pair : module->blocks) {
-		//	gen_ast(&pair.second, "mainCRTStartup");
-		//	llvm::verifyFunction(*pair.second.func);
-		//}
-		//CodeBlock initBlock = { ast };
-		//gen_ast(&initBlock, "mainCRTStartup");
-		Function mainFunc = Function("mainCRTStartup", std::vector<Parameter>(), new Program(ast));
+		Function mainFunc("mainCRTStartup", std::vector<Parameter>(), new Program(ast));
 		gen_func(&mainFunc);
 
 		// Generate binary

@@ -6,6 +6,7 @@ public:
 public:
 	Expression(std::string type)
 		: type(type) {}
+	virtual bool lvalue() { return false; }
 };
 
 class Number : public Expression {
@@ -38,6 +39,7 @@ public:
 public:
 	Identifier(std::string value)
 		: Expression("var"), value(value) {}
+	virtual bool lvalue() override { return true; }
 };
 
 class Parameter {
