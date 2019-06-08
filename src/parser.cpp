@@ -164,13 +164,14 @@ namespace parser {
 			Token tok = input->next();
 			if (tok.type == "var") return new Identifier(tok.value);
 			if (tok.type == "num") return new Number(std::stoi(tok.value));
+			if (tok.type == "char") return new Character((int)tok.value[0]);
 			if (tok.type == "str") return new String(tok.value);
 			unexpected();
 			return nullptr;
 		});
 	}
 
-	Expression* parse_expr() {
+	Expression * parse_expr() {
 		return maybe_call([]() -> Expression * {
 			return maybe_binary(parse_atom(), 0);
 		});

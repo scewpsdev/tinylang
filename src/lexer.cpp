@@ -18,12 +18,16 @@ namespace lexer {
 		return ch == ' ' || ch == '\t' || ch == '\n';
 	}
 
+	bool is_number(char ch1, char ch2) {
+		return std::isdigit(ch1) || ch1 == '-' && std::isdigit(ch2);
+	}
+
 	bool is_ident(char ch) {
 		return std::isdigit(ch) || std::isalpha(ch);
 	}
 
 	bool is_punc(char ch) {
-		std::string chars = ",;(){}[]";
+		std::string chars = ",;(){}[]'";
 		return chars.find(ch) != std::string::npos;
 	}
 
@@ -64,8 +68,12 @@ namespace lexer {
 	}
 
 	Token read_number() {
-		std::string numstr = read_while([](char ch) -> bool { return std::isdigit(ch); });
+		std::string numstr = read_while([](char ch) -> bool { return std::isdigit(ch) || ch == '-'; });
 		return { "num", numstr };
+	}
+
+	Token read_char() {
+		return { "char", read_escaped('\'') };
 	}
 
 	Token read_ident() {
@@ -102,7 +110,8 @@ namespace lexer {
 			return read_next();
 		}
 		if (ch == '"') return read_string();
-		if (std::isdigit(ch)) return read_number();
+		if (ch == '\'') return read_char();
+		if (is_number(ch, ch2)) return read_number();
 		if (is_ident(ch)) return read_ident();
 		if (is_punc(ch)) return { "punc", std::string(1, input->next()) };
 		if (is_op(ch)) return { "op", read_while(is_op) };

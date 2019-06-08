@@ -17,6 +17,10 @@ namespace printer {
 		out << std::to_string(num->value);
 	}
 
+	void print_char(Character* ch, std::ostream& out) {
+		out << '\'' << (wchar_t)ch->value << '\'';
+	}
+
 	void print_str(String* str, std::ostream& out) {
 		out << "\"" << str->value << "\"";
 	}
@@ -106,6 +110,7 @@ namespace printer {
 		if (expr->type == "bool") print_bool((Boolean*)expr, out);
 		if (expr->type == "str") print_str((String*)expr, out);
 		if (expr->type == "num") print_num((Number*)expr, out);
+		if (expr->type == "char") print_char((Character*)expr, out);
 		if (expr->type == "func") print_function((Function*)expr, out);
 	}
 

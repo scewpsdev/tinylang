@@ -17,6 +17,14 @@ public:
 		: Expression("num"), value(value) {}
 };
 
+class Character : public Expression {
+public:
+	int value;
+public:
+	Character(int value)
+		: Expression("char"), value(value) {}
+};
+
 class String : public Expression {
 public:
 	std::string value;
