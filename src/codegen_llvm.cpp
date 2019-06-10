@@ -280,7 +280,7 @@ namespace codegen {
 		for (std::pair<std::string, AST*> pair : moduleList) {
 			linkCmd << "out/" << pair.first << ".o ";
 		}
-		linkCmd << "cstdlib.lib /subsystem:console /out:a.exe";
+		linkCmd << "msvcrt.lib /subsystem:console /out:a.exe";
 		//std::cout << linkCmd.str() << std::endl;
 		system(linkCmd.str().c_str());
 
