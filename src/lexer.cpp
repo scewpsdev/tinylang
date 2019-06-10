@@ -9,6 +9,9 @@ const std::string keywords = " ext def if else true false null ";
 namespace lexer {
 	InputStream* input;
 	Token current;
+	int line = 1, col = 1;
+
+	void error(const std::string& msg);
 
 	bool is_keyword(const std::string& str) {
 		return keywords.find(" " + str + " ", 0) != std::string::npos;
@@ -115,7 +118,7 @@ namespace lexer {
 		if (is_ident(ch)) return read_ident();
 		if (is_punc(ch)) return { "punc", std::string(1, input->next()) };
 		if (is_op(ch)) return { "op", read_while(is_op) };
-		input->error("Can't handle character '" + std::string(1, ch) + "'");
+		error("Can't handle character '" + std::string(1, ch) + "'");
 		return Token::Null;
 	}
 
@@ -126,23 +129,21 @@ namespace lexer {
 	Token next() {
 		Token tok = current;
 		current = Token::Null;
+		line = input->getLine();
+		col = input->getCol();
 		return tok.type != "" ? tok : read_next();
-	}
-
-	void reset() {
-		input->reset();
 	}
 
 	bool eof() {
 		return peek().type == "";
 	}
 
-	void error(const std::string & msg) {
-		input->error(msg);
+	void error(const std::string& msg) {
+		input->error(msg, line, col);
 	}
 }
 
-Lexer::Lexer(InputStream * input) {
+Lexer::Lexer(InputStream* input) {
 	lexer::input = input;
 }
 
@@ -154,14 +155,10 @@ Token Lexer::next() {
 	return lexer::next();
 }
 
-void Lexer::reset() {
-	lexer::reset();
-}
-
 bool Lexer::eof() {
 	return lexer::eof();
 }
 
-void Lexer::error(const std::string & msg) {
+void Lexer::error(const std::string& msg) {
 	lexer::error(msg);
 }

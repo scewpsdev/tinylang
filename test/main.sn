@@ -17,6 +17,6 @@ num = -50 * 2 - 2 + 1;
 num = num * -1;
 num = 'U';
 //func(num);
-putchar(num)
+putchar(num);
 putchar(99);
 putchar(10);

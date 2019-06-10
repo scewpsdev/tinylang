@@ -24,12 +24,14 @@ char InputStream::peek(int off) {
 
 void InputStream::reset() {
 	pos = 0;
+	line = 1;
+	col = 1;
 }
 
 bool InputStream::eof() {
 	return pos >= input.length();
 }
 
-void InputStream::error(const std::string& msg) {
+void InputStream::error(const std::string& msg, int line, int col) {
 	std::cerr << "(" << line << ":" << col << ") " << msg << std::endl;
 }

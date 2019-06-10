@@ -16,7 +16,6 @@ public:
 
 	Token peek();
 	Token next();
-	void reset();
 	bool eof();
 	void error(const std::string& msg);
 };

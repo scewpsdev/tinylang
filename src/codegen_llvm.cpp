@@ -47,7 +47,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::Value* find_var(const std::string & name, CodeBlock * block) {
+	llvm::Value* find_var(const std::string& name, CodeBlock* block) {
 		if (!block) return nullptr;
 		if (block->locals.count(name)) return block->locals[name];
 		if (llvm::Value * val = find_var(name, block->parent)) return val;
@@ -55,7 +55,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::AllocaInst* alloc_var(const std::string & name, llvm::Type * type) {
+	llvm::AllocaInst* alloc_var(const std::string& name, llvm::Type* type) {
 		llvm::BasicBlock* entry = &module->llvmFunc->getEntryBlock();
 		llvm::IRBuilder<> builder(entry, entry->begin());
 		llvm::AllocaInst* alloc = builder.CreateAlloca(type, nullptr, name);
@@ -63,31 +63,31 @@ namespace codegen {
 		return alloc;
 	}
 
-	llvm::Value* gen_num(Number * num) {
+	llvm::Value* gen_num(Number* num) {
 		return llvm::ConstantInt::get(context, llvm::APInt(32, num->value));
 	}
 
-	llvm::Value* gen_char(Character * ch) {
+	llvm::Value* gen_char(Character* ch) {
 		return llvm::ConstantInt::get(context, llvm::APInt(8, ch->value));
 	}
 
-	llvm::Value* gen_str(String * str) {
+	llvm::Value* gen_str(String* str) {
 		return nullptr;
 	}
 
-	llvm::Value* gen_bool(Boolean * boolexpr) {
+	llvm::Value* gen_bool(Boolean* boolexpr) {
 		return nullptr;
 	}
 
-	llvm::Value* gen_ident(Identifier * ident) {
+	llvm::Value* gen_ident(Identifier* ident) {
 		return find_var(ident->value, block);
 	}
 
-	llvm::Value* gen_closure(Closure * cls) {
+	llvm::Value* gen_closure(Closure* cls) {
 		return nullptr;
 	}
 
-	llvm::Value* gen_call(Call * call) {
+	llvm::Value* gen_call(Call* call) {
 		// Cast
 		if (call->func->type == "var" && call->args.size() == 1) {
 			if (llvm::Type * type = llvm_type(((Identifier*)call->func)->value)) {
@@ -103,11 +103,11 @@ namespace codegen {
 		return builder.CreateCall(callee, args);
 	}
 
-	llvm::Value* gen_if(If * ifexpr) {
+	llvm::Value* gen_if(If* ifexpr) {
 		return nullptr;
 	}
 
-	llvm::Value* gen_assign(Assign * assign) {
+	llvm::Value* gen_assign(Assign* assign) {
 		llvm::Value* left = gen_expr(assign->left);
 		llvm::Value* right = gen_expr(assign->right);
 		if (!left) {
@@ -116,13 +116,14 @@ namespace codegen {
 			}
 			else {
 				// TODO ERROR
+				return nullptr;
 			}
 		}
-		builder.CreateStore(cast(rval(right), left->getType()->getScalarType()), left, false);
+		builder.CreateStore(cast(rval(right), left->getType()->getPointerElementType()), left, false);
 		return right;
 	}
 
-	llvm::Value* gen_binary(Binary * binary) {
+	llvm::Value* gen_binary(Binary* binary) {
 		llvm::Value* left = rval(gen_expr(binary->left));
 		llvm::Value* right = rval(gen_expr(binary->right));
 		if (binary->op == "+") return builder.CreateAdd(left, right);
@@ -134,7 +135,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::Value * gen_ast(AST * ast) {
+	llvm::Value* gen_ast(AST* ast) {
 		CodeBlock* parent = block;
 		block = new CodeBlock(parent);
 		for (int i = 0; i < ast->vars.size(); i++) {
@@ -145,11 +146,11 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::Value* gen_prog(Program * prog) {
+	llvm::Value* gen_prog(Program* prog) {
 		return gen_ast(prog->ast);
 	}
 
-	llvm::Value* gen_func(Function * func) {
+	llvm::Value* gen_func(Function* func) {
 		std::vector<llvm::Type*> params;
 		for (int i = 0; i < func->params.size(); i++) {
 			params.push_back(llvm_type(func->params[i].type));
@@ -188,7 +189,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::Value* gen_expr(Expression * expr) {
+	llvm::Value* gen_expr(Expression* expr) {
 		if (expr->type == "prog") return gen_prog((Program*)expr);
 		if (expr->type == "binary") return gen_binary((Binary*)expr);
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
@@ -204,7 +205,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	void gen_module(std::string name, AST * ast) {
+	void gen_module(std::string name, AST* ast) {
 		module = new ModuleData();
 		module->llvmMod = new llvm::Module(name, context);
 
