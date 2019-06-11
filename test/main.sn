@@ -13,10 +13,12 @@ def func(i32 arg) {
 	foo();
 };
 
-num = -50 * 2 - 2 + 1;
-num = num * -1;
-num = 'U';
-//func(num);
-putchar(num);
+num = 50 * 2 + 2 - 1;
+char = 'U';
+bool = true;
+tmp = 99 + i32(bool);
+func(tmp);
 putchar(99);
 putchar(10);
+
+if num == 101 putchar(97);

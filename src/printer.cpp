@@ -58,7 +58,7 @@ namespace printer {
 		print_expr(ifexpr->cond, out);
 		out << " ";
 		print_expr(ifexpr->then, out);
-		if (ifexpr->els->type != "") {
+		if (ifexpr->els) {
 			out << " else ";
 			print_expr(ifexpr->els, out);
 		}
