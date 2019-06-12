@@ -21,4 +21,9 @@ func(tmp);
 putchar(99);
 putchar(10);
 
-if num == 101 putchar(97);
+ree = 100;
+//num -= 1;
+if num == ree putchar(97)
+else putchar(100);
+
+putchar(10);

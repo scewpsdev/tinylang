@@ -49,7 +49,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	void binary_type(llvm::Value * &left, llvm::Value * &right) {
+	void binary_type(llvm::Value*& left, llvm::Value*& right) {
 		if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
 			llvm::Type* type = llvm::Type::getIntNTy(context, max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
 			left = cast(left, type);
@@ -58,7 +58,7 @@ namespace codegen {
 		// TODO ERROR
 	}
 
-	llvm::Value* find_var(std::string name, CodeBlock * block) {
+	llvm::Value* find_var(std::string name, CodeBlock* block) {
 		if (!block) return nullptr;
 		if (block->locals.count(name)) return block->locals[name];
 		if (llvm::Value * val = find_var(name, block->parent)) return val;
@@ -66,7 +66,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::AllocaInst* alloc_var(const std::string & name, llvm::Type * type) {
+	llvm::AllocaInst* alloc_var(const std::string& name, llvm::Type* type) {
 		llvm::BasicBlock* entry = &module->llvmFunc->getEntryBlock();
 		llvm::IRBuilder<> builder(entry, entry->begin());
 		llvm::AllocaInst* alloc = builder.CreateAlloca(type, nullptr, name);
@@ -74,7 +74,7 @@ namespace codegen {
 		return alloc;
 	}
 
-	std::string mangle(const std::string & name, std::vector<llvm::Type*> args) {
+	std::string mangle(const std::string& name, std::vector<llvm::Type*> args) {
 		std::stringstream result;
 		result << "__" << name;
 		for (int i = 0; i < args.size(); i++) {
@@ -83,7 +83,7 @@ namespace codegen {
 		return result.str();
 	}
 
-	std::string mangle(const std::string & name, std::vector<llvm::Value*> args) {
+	std::string mangle(const std::string& name, std::vector<llvm::Value*> args) {
 		std::vector<llvm::Type*> argtypes(args.size());
 		for (int i = 0; i < args.size(); i++) {
 			argtypes[i] = args[i]->getType();
@@ -91,7 +91,7 @@ namespace codegen {
 		return mangle(name, argtypes);
 	}
 
-	llvm::Value* call_func(const std::string & name, std::vector<llvm::Value*> args, CodeBlock * block) {
+	llvm::Value* call_func(const std::string& name, std::vector<llvm::Value*> args, CodeBlock* block) {
 		llvm::Value* callee = nullptr;
 		if (callee = find_var(name, block));
 		else callee = find_var(mangle(name, args), block);
@@ -104,31 +104,31 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::Value* gen_num(Number * num) {
+	llvm::Value* gen_num(Number* num) {
 		return llvm::ConstantInt::get(context, llvm::APInt(32, num->value));
 	}
 
-	llvm::Value* gen_char(Character * ch) {
+	llvm::Value* gen_char(Character* ch) {
 		return llvm::ConstantInt::get(context, llvm::APInt(8, ch->value));
 	}
 
-	llvm::Value* gen_str(String * str) {
+	llvm::Value* gen_str(String* str) {
 		return nullptr;
 	}
 
-	llvm::Value* gen_bool(Boolean * boolexpr) {
+	llvm::Value* gen_bool(Boolean* boolexpr) {
 		return llvm::ConstantInt::get(context, llvm::APInt(1, boolexpr->value ? 1 : 0));
 	}
 
-	llvm::Value* gen_ident(Identifier * ident) {
+	llvm::Value* gen_ident(Identifier* ident) {
 		return find_var(ident->value, block);
 	}
 
-	llvm::Value* gen_closure(Closure * cls) {
+	llvm::Value* gen_closure(Closure* cls) {
 		return nullptr;
 	}
 
-	llvm::Value* gen_call(Call * call) {
+	llvm::Value* gen_call(Call* call) {
 		// Cast
 		if (call->func->type == "var" && call->args.size() == 1) {
 			if (llvm::Type * type = llvm_type(((Identifier*)call->func)->value)) {
@@ -144,14 +144,62 @@ namespace codegen {
 		return builder.CreateCall(callee, args);
 	}
 
-	llvm::Value* gen_if(If * ifexpr) {
-		return nullptr;
+	llvm::Value* gen_if(If* ifexpr) {
+		llvm::Value* cond = cast(rval(gen_expr(ifexpr->cond)), llvm::Type::getInt1Ty(context));
+		llvm::BasicBlock* thenb = llvm::BasicBlock::Create(context, "then", module->llvmFunc);
+		llvm::BasicBlock* elseb = llvm::BasicBlock::Create(context, "else");
+		llvm::BasicBlock* mergeb = llvm::BasicBlock::Create(context, "merge");
+		builder.CreateCondBr(cond, thenb, elseb);
+
+		builder.SetInsertPoint(thenb);
+		llvm::Value* thenres = gen_expr(ifexpr->then);
+		builder.CreateBr(mergeb);
+		thenb = builder.GetInsertBlock();
+
+		module->llvmFunc->getBasicBlockList().push_back(elseb);
+		builder.SetInsertPoint(elseb);
+		llvm::Value* elseres = ifexpr->els ? gen_expr(ifexpr->els) : nullptr;
+		builder.CreateBr(mergeb);
+		elseb = builder.GetInsertBlock();
+
+		module->llvmFunc->getBasicBlockList().push_back(mergeb);
+		builder.SetInsertPoint(mergeb);
+
+		if (elseres) {
+			if (thenres->getType() != elseres->getType()) {
+				elseres = cast(elseres, thenres->getType());
+			}
+			llvm::PHINode* phi = builder.CreatePHI(thenres->getType(), 2);
+			phi->addIncoming(thenres, thenb);
+			phi->addIncoming(elseres, elseb);
+			return phi;
+		}
+		return thenres;
 	}
 
-	llvm::Value* gen_assign(Assign * assign) {
+	llvm::Value* gen_binary(const std::string& op, llvm::Value* left, llvm::Value* right) {
+		if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
+			llvm::Type* type = llvm::Type::getIntNTy(context, max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
+			left = cast(left, type);
+			right = cast(right, type);
+			if (op == "+") return builder.CreateAdd(left, right);
+			if (op == "-") return builder.CreateSub(left, right);
+			if (op == "*") return builder.CreateMul(left, right);
+			if (op == "/") return builder.CreateSDiv(left, right);
+			if (op == "%") return builder.CreateSRem(left, right);
+			if (op == "==") return builder.CreateICmpEQ(left, right);
+			if (op == "<") return builder.CreateICmpSLT(left, right);
+			if (op == ">") return builder.CreateICmpSGT(left, right);
+			if (op == "<=") return builder.CreateICmpSLE(left, right);
+			if (op == ">=") return builder.CreateICmpSGE(left, right);
+		}
+		return call_func(op, { left, right }, block);
+	}
+
+	llvm::Value* gen_assign(Assign* assign) {
 		llvm::Value* left = gen_expr(assign->left);
 		llvm::Value* right = gen_expr(assign->right);
-		if (!left) {
+		if (assign->op == "=" && !left) {
 			if (assign->left->lvalue()) {
 				left = alloc_var(((Identifier*)assign->left)->value, assign->right->lvalue() ? right->getType()->getPointerElementType() : right->getType());
 			}
@@ -160,42 +208,38 @@ namespace codegen {
 				return nullptr;
 			}
 		}
-		builder.CreateStore(cast(rval(right), left->getType()->getPointerElementType()), left, false);
+		if (assign->op == "=") right = rval(right);
+		if (assign->op == "+=") right = gen_binary("+", builder.CreateLoad(left), rval(right));
+		if (assign->op == "-=") right = gen_binary("-", builder.CreateLoad(left), rval(right));
+
+		builder.CreateStore(cast(right, left->getType()->getPointerElementType()), left, false);
 		return right;
 	}
 
-	llvm::Value* gen_binary(Binary * binary) {
+	llvm::Value* gen_binary(Binary* binary) {
 		llvm::Value* left = rval(gen_expr(binary->left));
 		llvm::Value* right = rval(gen_expr(binary->right));
-		if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
-			llvm::Type* type = llvm::Type::getIntNTy(context, max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
-			left = cast(left, type);
-			right = cast(right, type);
-			if (binary->op == "+") return builder.CreateAdd(left, right);
-			if (binary->op == "-") return builder.CreateSub(left, right);
-			if (binary->op == "*") return builder.CreateMul(left, right);
-			if (binary->op == "/") return builder.CreateSDiv(left, right);
-			if (binary->op == "%") return builder.CreateSRem(left, right);
-		}
-		return call_func(binary->op, { left, right }, block);
+		return gen_binary(binary->op, left, right);
 	}
 
-	llvm::Value * gen_ast(AST * ast) {
+	llvm::Value* gen_ast(AST* ast) {
 		CodeBlock* parent = block;
 		block = new CodeBlock(parent);
+		llvm::Value* retval = nullptr;
 		for (int i = 0; i < ast->vars.size(); i++) {
-			gen_expr(ast->vars[i]);
+			llvm::Value* val = gen_expr(ast->vars[i]);
+			if (!retval && i == ast->vars.size() - 1) retval = val;
 		}
 		delete block;
 		block = parent;
-		return nullptr;
+		return retval;
 	}
 
-	llvm::Value* gen_prog(Program * prog) {
+	llvm::Value* gen_prog(Program* prog) {
 		return gen_ast(prog->ast);
 	}
 
-	llvm::Value* gen_func(Function * func) {
+	llvm::Value* gen_func(Function* func) {
 		std::vector<llvm::Type*> params;
 		for (int i = 0; i < func->params.size(); i++) {
 			params.push_back(llvm_type(func->params[i].type));
@@ -231,10 +275,10 @@ namespace codegen {
 			builder.SetInsertPoint(parentBlock);
 		}
 
-		return nullptr;
+		return llvmfunc;
 	}
 
-	llvm::Value* gen_expr(Expression * expr) {
+	llvm::Value* gen_expr(Expression* expr) {
 		if (expr->type == "prog") return gen_prog((Program*)expr);
 		if (expr->type == "binary") return gen_binary((Binary*)expr);
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
@@ -250,7 +294,7 @@ namespace codegen {
 		return nullptr;
 	}
 
-	void gen_module(std::string name, AST * ast) {
+	void gen_module(std::string name, AST* ast) {
 		module = new ModuleData();
 		module->llvmMod = new llvm::Module(name, context);
 

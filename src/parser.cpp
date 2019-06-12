@@ -4,7 +4,7 @@
 
 namespace parser {
 	const std::map<std::string, int> OP_PRECEDENCE = {
-		{"=", 1}, {"||", 2}, {"&&", 3}, {"<", 7}, {">", 7}, {"<=", 7}, {">=", 7}, {"==", 7}, {"!=", 7}, {"+", 10}, {"-", 10}, {"*", 20}, {"/", 20}, {"%", 20},
+		{"=", 1}, {"+=", 1}, {"-=", 1}, {"*=", 1}, {"/=", 1}, {"%=", 1}, {"||", 2}, {"&&", 3}, {"<", 7}, {">", 7}, {"<=", 7}, {">=", 7}, {"==", 7}, {"!=", 7}, {"+", 10}, {"-", 10}, {"*", 20}, {"/", 20}, {"%", 20},
 	};
 
 	Lexer* input;
@@ -53,7 +53,7 @@ namespace parser {
 			int tokprec = OP_PRECEDENCE.at(tok.value);
 			if (tokprec > prec) {
 				input->next();
-				if (tok.value == "=")
+				if (tok.value == "=" || tok.value.length() == 2 && tok.value[0] != '=' && tok.value[1] == '=')
 					return maybe_binary(new Assign(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec);
 				else
 					return maybe_binary(new Binary(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec);
