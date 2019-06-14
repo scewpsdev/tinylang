@@ -21,9 +21,14 @@ func(tmp);
 putchar(99);
 putchar(10);
 
-ree = 100;
-//num -= 1;
-if num == ree putchar(97)
-else putchar(100);
+var = num--;
+putchar(var);
+putchar('Ä');
+ree = 102;
+if num == 100 || ree > 105 {
+	putchar(97);
+} else {
+	putchar(100);
+};
 
 putchar(10);

@@ -132,6 +132,19 @@ public:
 	}
 };
 
+class Unary : public Expression {
+public:
+	std::string op;
+	bool position;
+	Expression* expr;
+public:
+	Unary(std::string op, bool position, Expression* expr)
+		: Expression("unary"), op(op), position(position), expr(expr) {}
+	~Unary() {
+		delete expr; expr = nullptr;
+	}
+};
+
 class Function : public Expression {
 public:
 	std::string funcname;

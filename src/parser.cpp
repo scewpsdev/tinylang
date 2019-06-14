@@ -13,6 +13,8 @@ namespace parser {
 	Expression* parse_expr();
 	Expression* parse_prog();
 
+	Expression* maybe_unary(Expression* e);
+
 	void unexpected() {
 		input->error("Unexpected token \"" + input->peek().value + "\"");
 	}
@@ -53,10 +55,11 @@ namespace parser {
 			int tokprec = OP_PRECEDENCE.at(tok.value);
 			if (tokprec > prec) {
 				input->next();
-				if (tok.value == "=" || tok.value.length() == 2 && tok.value[0] != '=' && tok.value[1] == '=')
-					return maybe_binary(new Assign(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec);
+				if (tok.value == "=" || tok.value.length() == 2 && (std::string("+-*/%").find(tok.value[0]) != std::string::npos) && tok.value[1] == '=') {
+					return maybe_unary(maybe_binary(new Assign(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec));
+				}
 				else
-					return maybe_binary(new Binary(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec);
+					return maybe_unary(maybe_binary(new Binary(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec));
 			}
 		}
 		return left;
@@ -96,9 +99,22 @@ namespace parser {
 		return new Call(func, delimited('(', ')', ',', parse_expr));
 	}
 
-	Expression* maybe_call(Expression* (*call)()) {
-		Expression* result = call();
-		return is_punc('(') ? parse_call(result) : result;
+	Expression* maybe_unary(Expression* e) {
+		if (is_punc('(')) return parse_call(e);
+		if (is_op("++")) {
+			skip_op("++");
+			return new Unary("++", true, e);
+		}
+		if (is_op("--")) {
+			skip_op("--");
+			return new Unary("--", true, e);
+		}
+		return e;
+	}
+
+	Expression* maybe_unary(Expression* (*call)()) {
+		Expression* e = call();
+		return maybe_unary(e);
 	}
 
 	If* parse_if() {
@@ -145,7 +161,7 @@ namespace parser {
 	}
 
 	Expression* parse_atom() {
-		return maybe_call([]() -> Expression * {
+		return maybe_unary([]() -> Expression * {
 			if (is_kw("ext")) return parse_ext();
 			if (is_kw("def")) return parse_func();
 			if (is_punc('(')) {
@@ -155,6 +171,10 @@ namespace parser {
 				return expr;
 			}
 			if (is_punc('{')) return parse_prog();
+			if (is_op("++") || is_op("--")) {
+				std::string op = input->next().value;
+				return new Unary(op, false, parse_atom());
+			}
 			if (is_kw("if")) return parse_if();
 			if (is_kw("true") || is_kw("false")) return parse_bool();
 			if (is_kw("cls")) {
@@ -172,9 +192,7 @@ namespace parser {
 	}
 
 	Expression* parse_expr() {
-		return maybe_call([]() -> Expression * {
-			return maybe_binary(parse_atom(), 0);
-		});
+		return maybe_binary(maybe_unary([]() -> Expression * { return parse_atom(); }), 0);
 	}
 
 	Expression* parse_prog() {

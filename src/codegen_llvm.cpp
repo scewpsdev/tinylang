@@ -139,7 +139,8 @@ namespace codegen {
 		llvm::Value* callee = gen_expr(call->func);
 		std::vector<llvm::Value*> args;
 		for (int i = 0; i < call->args.size(); i++) {
-			args.push_back(rval(gen_expr(call->args[i])));
+			llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + i * sizeof(llvm::Argument*);
+			args.push_back(cast(rval(gen_expr(call->args[i])), arg->getType()));
 		}
 		return builder.CreateCall(callee, args);
 	}
@@ -188,10 +189,13 @@ namespace codegen {
 			if (op == "/") return builder.CreateSDiv(left, right);
 			if (op == "%") return builder.CreateSRem(left, right);
 			if (op == "==") return builder.CreateICmpEQ(left, right);
+			if (op == "!=") return builder.CreateICmpNE(left, right);
 			if (op == "<") return builder.CreateICmpSLT(left, right);
 			if (op == ">") return builder.CreateICmpSGT(left, right);
-			if (op == "<=") return builder.CreateICmpSLE(left, right);
+			if (op == "<=") return builder.CreateICmpEQ(left, right);
 			if (op == ">=") return builder.CreateICmpSGE(left, right);
+			if (op == "&&") return builder.CreateAnd(left, right);
+			if (op == "||") return builder.CreateOr(left, right);
 		}
 		return call_func(op, { left, right }, block);
 	}
@@ -211,6 +215,9 @@ namespace codegen {
 		if (assign->op == "=") right = rval(right);
 		if (assign->op == "+=") right = gen_binary("+", builder.CreateLoad(left), rval(right));
 		if (assign->op == "-=") right = gen_binary("-", builder.CreateLoad(left), rval(right));
+		if (assign->op == "*=") right = gen_binary("*", builder.CreateLoad(left), rval(right));
+		if (assign->op == "/=") right = gen_binary("/", builder.CreateLoad(left), rval(right));
+		if (assign->op == "%=") right = gen_binary("%", builder.CreateLoad(left), rval(right));
 
 		builder.CreateStore(cast(right, left->getType()->getPointerElementType()), left, false);
 		return right;
@@ -220,6 +227,18 @@ namespace codegen {
 		llvm::Value* left = rval(gen_expr(binary->left));
 		llvm::Value* right = rval(gen_expr(binary->right));
 		return gen_binary(binary->op, left, right);
+	}
+
+	llvm::Value* gen_unary(Unary* unary) {
+		llvm::Value* expr = gen_expr(unary->expr);
+		llvm::Value* val = builder.CreateLoad(expr);
+		llvm::Value* result = nullptr;
+
+		if (unary->op == "++") result = gen_binary("+", val, llvm::ConstantInt::get(context, llvm::APInt(32, 1)));
+		if (unary->op == "--") result = gen_binary("-", val, llvm::ConstantInt::get(context, llvm::APInt(32, 1)));
+
+		builder.CreateStore(cast(result, expr->getType()->getPointerElementType()), expr, false);
+		return unary->position ? val : result;
 	}
 
 	llvm::Value* gen_ast(AST* ast) {
@@ -281,6 +300,7 @@ namespace codegen {
 	llvm::Value* gen_expr(Expression* expr) {
 		if (expr->type == "prog") return gen_prog((Program*)expr);
 		if (expr->type == "binary") return gen_binary((Binary*)expr);
+		if (expr->type == "unary") return gen_unary((Unary*)expr);
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
 		if (expr->type == "if") return gen_if((If*)expr);
 		if (expr->type == "call") return gen_call((Call*)expr);
