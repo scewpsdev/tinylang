@@ -3,6 +3,16 @@
 	This is a block comment
 */
 
+/*
+	TODO
+	- while loops
+	- references
+	- arrays
+	- structs
+	- strings
+	- for loops
+*/
+
 ext putchar(i32 char);
 
 def func(i32 arg) {
@@ -30,5 +40,20 @@ if num == 100 || ree > 105 {
 } else {
 	putchar(100);
 };
+putchar(10);
+
+i = 0;
+loop i < 11 {
+	putchar('R');
+	i++;
+};
+
+/*
+test = 'A';
+ptrToTest = &test;
+putchar(test);
+ptrToTest = 'B';
+putchar(test);
+*/
 
 putchar(10);

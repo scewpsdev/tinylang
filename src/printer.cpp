@@ -64,6 +64,13 @@ namespace printer {
 		}
 	}
 
+	void print_loop(Loop* loop, std::ostream& out) {
+		out << "loop ";
+		print_expr(loop->cond, out);
+		out << " ";
+		print_expr(loop->body, out);
+	}
+
 	void print_assign(Assign* assign, std::ostream& out) {
 		print_expr(assign->left, out);
 		out << " " << assign->op << " ";
@@ -111,6 +118,7 @@ namespace printer {
 		if (expr->type == "unary") print_unary((Unary*)expr, out);
 		if (expr->type == "assign") print_assign((Assign*)expr, out);
 		if (expr->type == "if") print_if((If*)expr, out);
+		if (expr->type == "loop") print_loop((Loop*)expr, out);
 		if (expr->type == "call") print_call((Call*)expr, out);
 		if (expr->type == "cls") print_closure((Closure*)expr, out);
 		if (expr->type == "var") print_ident((Identifier*)expr, out);

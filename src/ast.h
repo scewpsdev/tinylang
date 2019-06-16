@@ -104,6 +104,19 @@ public:
 	}
 };
 
+class Loop : public Expression {
+public:
+	Expression* cond;
+	Expression* body;
+public:
+	Loop(Expression* cond, Expression* body)
+		: Expression("loop"), cond(cond), body(body) {}
+	~Loop() {
+		delete cond; cond = nullptr;
+		delete body; body = nullptr;
+	}
+};
+
 class Assign : public Expression {
 public:
 	std::string op;

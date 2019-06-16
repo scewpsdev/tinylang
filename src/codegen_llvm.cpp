@@ -37,7 +37,7 @@ namespace codegen {
 		// TODO
 		if (name.length() >= 2 && name[0] == 'i') {
 			int bitsize = std::stoi(name.substr(1));
-			return llvm::Type::getIntNTy(context, bitsize);
+			return builder.getIntNTy(bitsize);
 		}
 		return nullptr;
 	}
@@ -51,7 +51,7 @@ namespace codegen {
 
 	void binary_type(llvm::Value*& left, llvm::Value*& right) {
 		if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
-			llvm::Type* type = llvm::Type::getIntNTy(context, max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
+			llvm::Type* type = builder.getIntNTy(max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
 			left = cast(left, type);
 			right = cast(right, type);
 		}
@@ -104,12 +104,15 @@ namespace codegen {
 		return nullptr;
 	}
 
+	void gen_core_defs() {
+	}
+
 	llvm::Value* gen_num(Number* num) {
-		return llvm::ConstantInt::get(context, llvm::APInt(32, num->value));
+		return builder.getInt32(num->value);
 	}
 
 	llvm::Value* gen_char(Character* ch) {
-		return llvm::ConstantInt::get(context, llvm::APInt(8, ch->value));
+		return builder.getInt8(ch->value);
 	}
 
 	llvm::Value* gen_str(String* str) {
@@ -117,7 +120,7 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_bool(Boolean* boolexpr) {
-		return llvm::ConstantInt::get(context, llvm::APInt(1, boolexpr->value ? 1 : 0));
+		return builder.getInt1(boolexpr->value);
 	}
 
 	llvm::Value* gen_ident(Identifier* ident) {
@@ -178,9 +181,22 @@ namespace codegen {
 		return thenres;
 	}
 
+	llvm::Value* gen_loop(Loop* loop) {
+		llvm::BasicBlock* loopb = llvm::BasicBlock::Create(context, "loop", module->llvmFunc);
+		builder.CreateBr(loopb);
+		builder.SetInsertPoint(loopb);
+		gen_expr(loop->body);
+		llvm::BasicBlock* mergeb = llvm::BasicBlock::Create(context, "merge", module->llvmFunc);
+		llvm::Value* cond = cast(rval(gen_expr(loop->cond)), llvm::Type::getInt1Ty(context));
+		builder.CreateCondBr(cond, loopb, mergeb);
+		builder.SetInsertPoint(mergeb);
+
+		return builder.getInt32(0);
+	}
+
 	llvm::Value* gen_binary(const std::string& op, llvm::Value* left, llvm::Value* right) {
 		if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
-			llvm::Type* type = llvm::Type::getIntNTy(context, max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
+			llvm::Type* type = builder.getIntNTy(max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
 			left = cast(left, type);
 			right = cast(right, type);
 			if (op == "+") return builder.CreateAdd(left, right);
@@ -234,8 +250,8 @@ namespace codegen {
 		llvm::Value* val = builder.CreateLoad(expr);
 		llvm::Value* result = nullptr;
 
-		if (unary->op == "++") result = gen_binary("+", val, llvm::ConstantInt::get(context, llvm::APInt(32, 1)));
-		if (unary->op == "--") result = gen_binary("-", val, llvm::ConstantInt::get(context, llvm::APInt(32, 1)));
+		if (unary->op == "++") result = gen_binary("+", val, builder.getInt32(1));
+		if (unary->op == "--") result = gen_binary("-", val, builder.getInt32(1));
 
 		builder.CreateStore(cast(result, expr->getType()->getPointerElementType()), expr, false);
 		return unary->position ? val : result;
@@ -263,7 +279,7 @@ namespace codegen {
 		for (int i = 0; i < func->params.size(); i++) {
 			params.push_back(llvm_type(func->params[i].type));
 		}
-		llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), params, false);
+		llvm::FunctionType* funcType = llvm::FunctionType::get(builder.getInt32Ty(), params, false);
 		llvm::Function* llvmfunc = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, func->funcname, module->llvmMod);
 		module->globals.insert(std::make_pair(func->funcname, llvmfunc));
 		int i = 0;
@@ -285,7 +301,7 @@ namespace codegen {
 			builder.SetInsertPoint(entry);
 
 			gen_expr(func->body);
-			builder.CreateRet(llvm::ConstantInt::get(context, llvm::APInt(32, 0)));
+			builder.CreateRet(builder.getInt32(0));
 
 			delete block;
 			block = parent;
@@ -303,6 +319,7 @@ namespace codegen {
 		if (expr->type == "unary") return gen_unary((Unary*)expr);
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
 		if (expr->type == "if") return gen_if((If*)expr);
+		if (expr->type == "loop") return gen_loop((Loop*)expr);
 		if (expr->type == "call") return gen_call((Call*)expr);
 		if (expr->type == "cls") return gen_closure((Closure*)expr);
 		if (expr->type == "var") return gen_ident((Identifier*)expr);
@@ -317,6 +334,8 @@ namespace codegen {
 	void gen_module(std::string name, AST* ast) {
 		module = new ModuleData();
 		module->llvmMod = new llvm::Module(name, context);
+
+		gen_core_defs();
 
 		Function mainFunc("mainCRTStartup", std::vector<Parameter>(), new Program(ast));
 		gen_func(&mainFunc);

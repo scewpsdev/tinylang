@@ -129,6 +129,13 @@ namespace parser {
 		return new If(cond, then, els);
 	}
 
+	Loop* parse_loop() {
+		skip_kw("loop");
+		Expression* cond = parse_expr();
+		Expression* body = parse_expr();
+		return new Loop(cond, body);
+	}
+
 	Parameter parse_param() {
 		std::string type = "";
 		std::string name = "";
@@ -176,6 +183,7 @@ namespace parser {
 				return new Unary(op, false, parse_atom());
 			}
 			if (is_kw("if")) return parse_if();
+			if (is_kw("loop")) return parse_loop();
 			if (is_kw("true") || is_kw("false")) return parse_bool();
 			if (is_kw("cls")) {
 				input->next();
