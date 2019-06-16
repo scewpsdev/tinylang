@@ -11,6 +11,7 @@
 	- structs
 	- strings
 	- for loops
+	- modules
 */
 
 ext putchar(i32 char);
@@ -33,7 +34,7 @@ putchar(10);
 
 var = num--;
 putchar(var);
-putchar('Ä');
+putchar('ï¿½');
 ree = 102;
 if num == 100 || ree > 105 {
 	putchar(97);
