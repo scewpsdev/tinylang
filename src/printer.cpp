@@ -91,6 +91,14 @@ namespace printer {
 		if (unary->position) out << unary->op;
 	}
 
+	void print_break(std::ostream& out) {
+		out << "break";
+	}
+
+	void print_continue(std::ostream& out) {
+		out << "continue";
+	}
+
 	void print_prog(Program* prog, std::ostream& out) {
 		out << indent() << "{" << std::endl;
 		numIndents++;
@@ -114,6 +122,8 @@ namespace printer {
 
 	void print_expr(Expression* expr, std::ostream& out) {
 		if (expr->type == "prog") print_prog((Program*)expr, out);
+		if (expr->type == "break") print_break(out);
+		if (expr->type == "continue") print_continue(out);
 		if (expr->type == "binary") print_binary((Binary*)expr, out);
 		if (expr->type == "unary") print_unary((Unary*)expr, out);
 		if (expr->type == "assign") print_assign((Assign*)expr, out);

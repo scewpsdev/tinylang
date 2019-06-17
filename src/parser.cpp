@@ -190,6 +190,10 @@ namespace parser {
 				return parse_closure();
 			}
 			Token tok = input->next();
+			if (tok.type == "kw") {
+				if (tok.value == "break") return new Break();
+				if (tok.value == "continue") return new Continue();
+			}
 			if (tok.type == "var") return new Identifier(tok.value);
 			if (tok.type == "num") return new Number(std::stoi(tok.value));
 			if (tok.type == "char") return new Character((int)tok.value[0]);

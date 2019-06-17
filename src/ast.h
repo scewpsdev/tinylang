@@ -158,6 +158,20 @@ public:
 	}
 };
 
+class Break : public Expression {
+public:
+	Break()
+		: Expression("break") {}
+	~Break() {}
+};
+
+class Continue : public Expression {
+public:
+	Continue()
+		: Expression("continue") {}
+	~Continue() {}
+};
+
 class Function : public Expression {
 public:
 	std::string funcname;

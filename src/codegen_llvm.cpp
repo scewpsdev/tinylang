@@ -12,8 +12,10 @@ namespace codegen {
 		llvm::Function* llvmFunc;
 	};
 	struct CodeBlock {
-		CodeBlock* parent;
+		CodeBlock* parent = nullptr;
 		std::map<std::string, llvm::AllocaInst*> locals;
+		llvm::BasicBlock* loopbegin = nullptr;
+		llvm::BasicBlock* loopend = nullptr;
 		CodeBlock(CodeBlock* parent) : parent(parent) {}
 	};
 
@@ -63,6 +65,20 @@ namespace codegen {
 		if (block->locals.count(name)) return block->locals[name];
 		if (llvm::Value * val = find_var(name, block->parent)) return val;
 		if (module->globals.count(name)) return module->globals[name];
+		return nullptr;
+	}
+
+	llvm::BasicBlock* find_loopbegin(CodeBlock* block) {
+		if (!block) return nullptr;
+		if (block->loopbegin) return block->loopbegin;
+		if (llvm::BasicBlock * b = find_loopbegin(block->parent)) return b;
+		return nullptr;
+	}
+
+	llvm::BasicBlock* find_loopend(CodeBlock* block) {
+		if (!block) return nullptr;
+		if (block->loopend) return block->loopend;
+		if (llvm::BasicBlock * b = find_loopend(block->parent)) return b;
 		return nullptr;
 	}
 
@@ -183,10 +199,15 @@ namespace codegen {
 
 	llvm::Value* gen_loop(Loop* loop) {
 		llvm::BasicBlock* loopb = llvm::BasicBlock::Create(context, "loop", module->llvmFunc);
+		llvm::BasicBlock* mergeb = llvm::BasicBlock::Create(context, "merge");
+		block->loopbegin = loopb;
+		block->loopend = mergeb;
 		builder.CreateBr(loopb);
 		builder.SetInsertPoint(loopb);
 		gen_expr(loop->body);
-		llvm::BasicBlock* mergeb = llvm::BasicBlock::Create(context, "merge", module->llvmFunc);
+		block->loopbegin = nullptr;
+		block->loopend = nullptr;
+		module->llvmFunc->getBasicBlockList().push_back(mergeb);
 		llvm::Value* cond = cast(rval(gen_expr(loop->cond)), llvm::Type::getInt1Ty(context));
 		builder.CreateCondBr(cond, loopb, mergeb);
 		builder.SetInsertPoint(mergeb);
@@ -257,6 +278,22 @@ namespace codegen {
 		return unary->position ? val : result;
 	}
 
+	llvm::Value* gen_break() {
+		if (llvm::BasicBlock * end = find_loopend(block)) {
+			return builder.CreateBr(end);
+		}
+		// TODO ERROR
+		return nullptr;
+	}
+
+	llvm::Value* gen_continue() {
+		if (llvm::BasicBlock * begin = find_loopbegin(block)) {
+			return builder.CreateBr(begin);
+		}
+		// TODO ERROR
+		return nullptr;
+	}
+
 	llvm::Value* gen_ast(AST* ast) {
 		CodeBlock* parent = block;
 		block = new CodeBlock(parent);
@@ -303,6 +340,19 @@ namespace codegen {
 			gen_expr(func->body);
 			builder.CreateRet(builder.getInt32(0));
 
+			for (llvm::BasicBlock& block : llvmfunc->getBasicBlockList()) {
+				bool terminated = false;
+				for (llvm::Instruction& inst : block.getInstList()) {
+					if (inst.getType()->getTypeID() == llvm::Instruction::Br) {
+						__debugbreak();
+						terminated = true;
+					}
+					else if (terminated) {
+						block.getInstList().remove(inst);
+					}
+				}
+			}
+
 			delete block;
 			block = parent;
 
@@ -315,6 +365,8 @@ namespace codegen {
 
 	llvm::Value* gen_expr(Expression* expr) {
 		if (expr->type == "prog") return gen_prog((Program*)expr);
+		if (expr->type == "break") return gen_break();
+		if (expr->type == "continue") return gen_continue();
 		if (expr->type == "binary") return gen_binary((Binary*)expr);
 		if (expr->type == "unary") return gen_unary((Unary*)expr);
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
