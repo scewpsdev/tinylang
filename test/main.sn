@@ -16,6 +16,7 @@
 
 ext putchar(i32 char);
 
+/*
 def func(i32 arg) {
 	def foo() {
 		putchar(100);
@@ -42,11 +43,12 @@ if num == 100 || ree > 105 {
 	putchar(100);
 };
 putchar(10);
+*/
 
 i = 0;
 loop i < 11 {
 	putchar('R' + i++);
-	break;
+	if i + 'R' - 1 == 'V' continue;
 	putchar('G');
 };
 

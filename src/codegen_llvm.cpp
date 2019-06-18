@@ -198,19 +198,28 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_loop(Loop* loop) {
-		llvm::BasicBlock* loopb = llvm::BasicBlock::Create(context, "loop", module->llvmFunc);
+		llvm::BasicBlock* headb = llvm::BasicBlock::Create(context, "head", module->llvmFunc);
+		llvm::BasicBlock* loopb = llvm::BasicBlock::Create(context, "loop");
 		llvm::BasicBlock* mergeb = llvm::BasicBlock::Create(context, "merge");
-		block->loopbegin = loopb;
+		block->loopbegin = headb;
 		block->loopend = mergeb;
-		builder.CreateBr(loopb);
-		builder.SetInsertPoint(loopb);
-		gen_expr(loop->body);
-		block->loopbegin = nullptr;
-		block->loopend = nullptr;
-		module->llvmFunc->getBasicBlockList().push_back(mergeb);
+
+		builder.CreateBr(headb);
+
+		builder.SetInsertPoint(headb);
 		llvm::Value* cond = cast(rval(gen_expr(loop->cond)), llvm::Type::getInt1Ty(context));
 		builder.CreateCondBr(cond, loopb, mergeb);
+
+		module->llvmFunc->getBasicBlockList().push_back(loopb);
+		builder.SetInsertPoint(loopb);
+		gen_expr(loop->body);
+		builder.CreateBr(headb);
+
+		module->llvmFunc->getBasicBlockList().push_back(mergeb);
 		builder.SetInsertPoint(mergeb);
+
+		block->loopbegin = nullptr;
+		block->loopend = nullptr;
 
 		return builder.getInt32(0);
 	}
@@ -280,7 +289,10 @@ namespace codegen {
 
 	llvm::Value* gen_break() {
 		if (llvm::BasicBlock * end = find_loopend(block)) {
-			return builder.CreateBr(end);
+			builder.CreateBr(end);
+			llvm::BasicBlock* afterbreakb = llvm::BasicBlock::Create(context, "afterbreak", module->llvmFunc);
+			builder.SetInsertPoint(afterbreakb);
+			return nullptr;
 		}
 		// TODO ERROR
 		return nullptr;
@@ -288,7 +300,10 @@ namespace codegen {
 
 	llvm::Value* gen_continue() {
 		if (llvm::BasicBlock * begin = find_loopbegin(block)) {
-			return builder.CreateBr(begin);
+			builder.CreateBr(begin);
+			llvm::BasicBlock* afterbreakb = llvm::BasicBlock::Create(context, "afterbreak", module->llvmFunc);
+			builder.SetInsertPoint(afterbreakb);
+			return nullptr;
 		}
 		// TODO ERROR
 		return nullptr;
@@ -340,6 +355,7 @@ namespace codegen {
 			gen_expr(func->body);
 			builder.CreateRet(builder.getInt32(0));
 
+			/*
 			for (llvm::BasicBlock& block : llvmfunc->getBasicBlockList()) {
 				bool terminated = false;
 				for (llvm::Instruction& inst : block.getInstList()) {
@@ -352,6 +368,7 @@ namespace codegen {
 					}
 				}
 			}
+			*/
 
 			delete block;
 			block = parent;
