@@ -131,6 +131,12 @@ namespace parser {
 
 	Loop* parse_loop() {
 		skip_kw("loop");
+		Expression* body = parse_expr();
+		return new Loop(new Boolean(true), body);
+	}
+
+	Loop* parse_while() {
+		skip_kw("while");
 		Expression* cond = parse_expr();
 		Expression* body = parse_expr();
 		return new Loop(cond, body);
@@ -178,12 +184,13 @@ namespace parser {
 				return expr;
 			}
 			if (is_punc('{')) return parse_prog();
-			if (is_op("++") || is_op("--")) {
+			if (is_op("++") || is_op("--") || is_op("!") || is_op("&")) {
 				std::string op = input->next().value;
 				return new Unary(op, false, parse_atom());
 			}
 			if (is_kw("if")) return parse_if();
 			if (is_kw("loop")) return parse_loop();
+			if (is_kw("while")) return parse_while();
 			if (is_kw("true") || is_kw("false")) return parse_bool();
 			if (is_kw("cls")) {
 				input->next();

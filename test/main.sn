@@ -5,7 +5,7 @@
 
 /*
 	TODO
-	- while loops
+	//- while loops
 	- references
 	- arrays
 	- structs
@@ -43,21 +43,22 @@ if num == 100 || ree > 105 {
 	putchar(100);
 };
 putchar(10);
-*/
 
 i = 0;
-loop i < 11 {
+loop {
 	putchar('R' + i++);
 	if i + 'R' - 1 == 'V' continue;
 	putchar('G');
+	if i == 11 break;
 };
+*/
 
-/*
 test = 'A';
 ptrToTest = &test;
+//putchar(test);
+//ptrToTest = 'B';
 putchar(test);
-ptrToTest = 'B';
-putchar(test);
+/*
 */
 
 putchar(10);

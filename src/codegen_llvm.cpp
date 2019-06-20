@@ -28,11 +28,8 @@ namespace codegen {
 
 	llvm::Value* gen_expr(Expression* expr);
 
-	llvm::Value* rval(llvm::Value* val) {
-		if (val->getType()->isPointerTy()) {
-			return builder.CreateLoad(val);
-		}
-		return val;
+	llvm::Value* rval(llvm::Value* val, bool lvalue) {
+		return lvalue ? builder.CreateLoad(val) : val;
 	}
 
 	llvm::Type* llvm_type(std::string name) {
@@ -151,7 +148,7 @@ namespace codegen {
 		// Cast
 		if (call->func->type == "var" && call->args.size() == 1) {
 			if (llvm::Type * type = llvm_type(((Identifier*)call->func)->value)) {
-				return cast(rval(gen_expr(call->args[0])), type);
+				return cast(rval(gen_expr(call->args[0]), call->lvalue()), type);
 			}
 		}
 		// Function call
@@ -159,13 +156,13 @@ namespace codegen {
 		std::vector<llvm::Value*> args;
 		for (int i = 0; i < call->args.size(); i++) {
 			llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + i * sizeof(llvm::Argument*);
-			args.push_back(cast(rval(gen_expr(call->args[i])), arg->getType()));
+			args.push_back(cast(rval(gen_expr(call->args[i]), call->args[i]->lvalue()), arg->getType()));
 		}
 		return builder.CreateCall(callee, args);
 	}
 
 	llvm::Value* gen_if(If* ifexpr) {
-		llvm::Value* cond = cast(rval(gen_expr(ifexpr->cond)), llvm::Type::getInt1Ty(context));
+		llvm::Value* cond = cast(rval(gen_expr(ifexpr->cond), ifexpr->lvalue()), llvm::Type::getInt1Ty(context));
 		llvm::BasicBlock* thenb = llvm::BasicBlock::Create(context, "then", module->llvmFunc);
 		llvm::BasicBlock* elseb = llvm::BasicBlock::Create(context, "else");
 		llvm::BasicBlock* mergeb = llvm::BasicBlock::Create(context, "merge");
@@ -207,7 +204,7 @@ namespace codegen {
 		builder.CreateBr(headb);
 
 		builder.SetInsertPoint(headb);
-		llvm::Value* cond = cast(rval(gen_expr(loop->cond)), llvm::Type::getInt1Ty(context));
+		llvm::Value* cond = cast(rval(gen_expr(loop->cond), loop->lvalue()), llvm::Type::getInt1Ty(context));
 		builder.CreateCondBr(cond, loopb, mergeb);
 
 		module->llvmFunc->getBasicBlockList().push_back(loopb);
@@ -258,20 +255,20 @@ namespace codegen {
 				return nullptr;
 			}
 		}
-		if (assign->op == "=") right = rval(right);
-		if (assign->op == "+=") right = gen_binary("+", builder.CreateLoad(left), rval(right));
-		if (assign->op == "-=") right = gen_binary("-", builder.CreateLoad(left), rval(right));
-		if (assign->op == "*=") right = gen_binary("*", builder.CreateLoad(left), rval(right));
-		if (assign->op == "/=") right = gen_binary("/", builder.CreateLoad(left), rval(right));
-		if (assign->op == "%=") right = gen_binary("%", builder.CreateLoad(left), rval(right));
+		if (assign->op == "=") right = rval(right, assign->right->lvalue());
+		if (assign->op == "+=") right = gen_binary("+", builder.CreateLoad(left), rval(right, assign->right->lvalue()));
+		if (assign->op == "-=") right = gen_binary("-", builder.CreateLoad(left), rval(right, assign->right->lvalue()));
+		if (assign->op == "*=") right = gen_binary("*", builder.CreateLoad(left), rval(right, assign->right->lvalue()));
+		if (assign->op == "/=") right = gen_binary("/", builder.CreateLoad(left), rval(right, assign->right->lvalue()));
+		if (assign->op == "%=") right = gen_binary("%", builder.CreateLoad(left), rval(right, assign->right->lvalue()));
 
 		builder.CreateStore(cast(right, left->getType()->getPointerElementType()), left, false);
 		return right;
 	}
 
 	llvm::Value* gen_binary(Binary* binary) {
-		llvm::Value* left = rval(gen_expr(binary->left));
-		llvm::Value* right = rval(gen_expr(binary->right));
+		llvm::Value* left = rval(gen_expr(binary->left), binary->left->lvalue());
+		llvm::Value* right = rval(gen_expr(binary->right), binary->right->lvalue());
 		return gen_binary(binary->op, left, right);
 	}
 
@@ -280,10 +277,17 @@ namespace codegen {
 		llvm::Value* val = builder.CreateLoad(expr);
 		llvm::Value* result = nullptr;
 
-		if (unary->op == "++") result = gen_binary("+", val, builder.getInt32(1));
-		if (unary->op == "--") result = gen_binary("-", val, builder.getInt32(1));
+		if (unary->op == "++") {
+			result = gen_binary("+", val, builder.getInt32(1));
+			builder.CreateStore(cast(result, expr->getType()->getPointerElementType()), expr, false);
+		}
+		if (unary->op == "--") {
+			result = gen_binary("-", val, builder.getInt32(1));
+			builder.CreateStore(cast(result, expr->getType()->getPointerElementType()), expr, false);
+		}
+		if (unary->op == "!") result = builder.CreateNeg(val);
+		if (unary->op == "&") result = expr;
 
-		builder.CreateStore(cast(result, expr->getType()->getPointerElementType()), expr, false);
 		return unary->position ? val : result;
 	}
 
