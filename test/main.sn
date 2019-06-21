@@ -51,7 +51,21 @@ loop {
 	putchar('G');
 	if i == 11 break;
 };
+
 */
+
+for 10 {
+	putchar('0' + __it);
+}
+for i, 10 {
+	putchar('A' + i);
+}
+for i, 2, 10 {
+	putchar('0' + i);
+}
+for i, 0, 10, 2 {
+	putchar('A' + i);
+};
 
 test = 'A';
 ptrToTest = &test;

@@ -132,14 +132,73 @@ namespace parser {
 	Loop* parse_loop() {
 		skip_kw("loop");
 		Expression* body = parse_expr();
-		return new Loop(new Boolean(true), body);
+		return new Loop(nullptr, nullptr, new Boolean(true), body);
 	}
 
 	Loop* parse_while() {
 		skip_kw("while");
 		Expression* cond = parse_expr();
 		Expression* body = parse_expr();
-		return new Loop(cond, body);
+		return new Loop(nullptr, nullptr, cond, body);
+	}
+
+	Loop* parse_for() {
+		skip_kw("for");
+		Expression* first = parse_expr();
+		Expression* second = nullptr;
+		Expression* third = nullptr;
+		Expression* fourth = nullptr;
+		if (is_punc(',')) {
+			skip_punc(',');
+			second = parse_expr();
+		}
+		if (is_punc(',')) {
+			skip_punc(',');
+			third = parse_expr();
+		}
+		if (is_punc(',')) {
+			skip_punc(',');
+			fourth = parse_expr();
+		}
+		if (is_punc(',')) {
+			// TODO ERROR
+		}
+		Expression* body = parse_expr();
+		if (first && !second) {
+			if (first->type != "num") {
+				// TODO ERROR
+			}
+			int numits = ((Number*)first)->value;
+			return new Loop(new Assign("=", new Identifier("__it"), new Number(0)), new Unary("++", true, new Identifier("__it")), new Binary("<", new Identifier("__it"), new Number(numits)), body);
+		}
+		if (first && second && !third) {
+			if (first->type != "var") {
+				// TODO ERROR
+			}
+			if (second->type != "num") {
+				// TODO ERROR
+			}
+			std::string itname = ((Identifier*)first)->value;
+			int numits = ((Number*)second)->value;
+			return new Loop(new Assign("=", new Identifier(itname), new Number(0)), new Unary("++", true, new Identifier(itname)), new Binary("<", new Identifier(itname), new Number(numits)), body);
+		}
+		if (first && second && third && !fourth) {
+			std::string itname = ((Identifier*)first)->value;
+			int start = ((Number*)second)->value;
+			int numits = ((Number*)third)->value;
+			return new Loop(new Assign("=", new Identifier(itname), new Number(start)), new Unary("++", true, new Identifier(itname)), new Binary("<", new Identifier(itname), new Number(numits)), body);
+		}
+		if (first && second && third && fourth) {
+			std::string itname = ((Identifier*)first)->value;
+			int start = ((Number*)second)->value;
+			int numits = ((Number*)third)->value;
+			int step = ((Number*)fourth)->value;
+			return new Loop(new Assign("=", new Identifier(itname), new Number(0)), new Assign("+=", new Identifier(itname), new Number(step)), new Binary("<", new Identifier(itname), new Number(numits)), body);
+		}
+		else {
+			// TODO ERROR
+		}
+		return nullptr;
 	}
 
 	Parameter parse_param() {
@@ -191,6 +250,7 @@ namespace parser {
 			if (is_kw("if")) return parse_if();
 			if (is_kw("loop")) return parse_loop();
 			if (is_kw("while")) return parse_while();
+			if (is_kw("for")) return parse_for();
 			if (is_kw("true") || is_kw("false")) return parse_bool();
 			if (is_kw("cls")) {
 				input->next();

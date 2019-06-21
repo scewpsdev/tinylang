@@ -4,7 +4,7 @@
 
 const Token Token::Null = { "", "" };
 
-const std::string keywords = " ext def if else while loop break continue true false null ";
+const std::string keywords = " ext def if else while loop for break continue true false null ";
 
 namespace lexer {
 	InputStream* input;
@@ -26,7 +26,7 @@ namespace lexer {
 	}
 
 	bool is_ident(char ch) {
-		return std::isdigit(ch) || std::isalpha(ch);
+		return std::isdigit(ch) || std::isalpha(ch) || ch == '_';
 	}
 
 	bool is_punc(char ch) {

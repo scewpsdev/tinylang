@@ -66,7 +66,15 @@ namespace printer {
 
 	void print_loop(Loop* loop, std::ostream& out) {
 		out << "loop ";
+		if (loop->init) {
+			print_expr(loop->init, out);
+			out << "; ";
+		}
 		print_expr(loop->cond, out);
+		if (loop->iterate) {
+			out << "; ";
+			print_expr(loop->iterate, out);
+		}
 		out << " ";
 		print_expr(loop->body, out);
 	}

@@ -106,12 +106,16 @@ public:
 
 class Loop : public Expression {
 public:
+	Expression* init;
+	Expression* iterate;
 	Expression* cond;
 	Expression* body;
 public:
-	Loop(Expression* cond, Expression* body)
-		: Expression("loop"), cond(cond), body(body) {}
+	Loop(Expression* init, Expression* iterate, Expression* cond, Expression* body)
+		: Expression("loop"), init(init), iterate(iterate), cond(cond), body(body) {}
 	~Loop() {
+		delete init; init = nullptr;
+		delete iterate; iterate = nullptr;
 		delete cond; cond = nullptr;
 		delete body; body = nullptr;
 	}

@@ -201,6 +201,7 @@ namespace codegen {
 		block->loopbegin = headb;
 		block->loopend = mergeb;
 
+		if (loop->init) gen_expr(loop->init);
 		builder.CreateBr(headb);
 
 		builder.SetInsertPoint(headb);
@@ -210,6 +211,7 @@ namespace codegen {
 		module->llvmFunc->getBasicBlockList().push_back(loopb);
 		builder.SetInsertPoint(loopb);
 		gen_expr(loop->body);
+		if (loop->iterate) gen_expr(loop->iterate);
 		builder.CreateBr(headb);
 
 		module->llvmFunc->getBasicBlockList().push_back(mergeb);
