@@ -276,21 +276,28 @@ namespace codegen {
 
 	llvm::Value* gen_unary(Unary* unary) {
 		llvm::Value* expr = gen_expr(unary->expr);
-		llvm::Value* val = builder.CreateLoad(expr);
-		llvm::Value* result = nullptr;
 
 		if (unary->op == "++") {
-			result = gen_binary("+", val, builder.getInt32(1));
+			llvm::Value* val = builder.CreateLoad(expr);
+			llvm::Value* result = gen_binary("+", val, builder.getInt32(1));
 			builder.CreateStore(cast(result, expr->getType()->getPointerElementType()), expr, false);
+			return unary->position ? val : expr;
 		}
 		if (unary->op == "--") {
-			result = gen_binary("-", val, builder.getInt32(1));
+			llvm::Value* val = builder.CreateLoad(expr);
+			llvm::Value* result = gen_binary("-", val, builder.getInt32(1));
 			builder.CreateStore(cast(result, expr->getType()->getPointerElementType()), expr, false);
+			return unary->position ? val : result;
 		}
-		if (unary->op == "!") result = builder.CreateNeg(val);
-		if (unary->op == "&") result = expr;
+		if (unary->op == "!") {
+			llvm::Value* val = builder.CreateLoad(expr);
+			return builder.CreateNeg(val);
+		}
+		if (unary->op == "&") return expr;
+		if (unary->op == "*") return builder.CreateLoad(expr);
 
-		return unary->position ? val : result;
+		// TODO ERROR
+		return nullptr;
 	}
 
 	llvm::Value* gen_break() {

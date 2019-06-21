@@ -160,6 +160,9 @@ public:
 	~Unary() {
 		delete expr; expr = nullptr;
 	}
+	virtual bool lvalue() override {
+		return ((op == "++" || op == "--") && !position) || (op == "*" && !position);
+	}
 };
 
 class Break : public Expression {

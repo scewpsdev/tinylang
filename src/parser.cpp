@@ -243,7 +243,7 @@ namespace parser {
 				return expr;
 			}
 			if (is_punc('{')) return parse_prog();
-			if (is_op("++") || is_op("--") || is_op("!") || is_op("&")) {
+			if (is_op("++") || is_op("--") || is_op("!") || is_op("&") || is_op("*")) {
 				std::string op = input->next().value;
 				return new Unary(op, false, parse_atom());
 			}

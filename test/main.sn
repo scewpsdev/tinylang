@@ -66,11 +66,12 @@ for i, 2, 10 {
 for i, 0, 10, 2 {
 	putchar('A' + i);
 };
+putchar(10);
 
 test = 'A';
 ptrToTest = &test;
-//putchar(test);
-//ptrToTest = 'B';
+putchar(test);
+*ptrToTest = 'B';
 putchar(test);
 /*
 */
