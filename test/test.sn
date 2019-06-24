@@ -1,0 +1,61 @@
+// This is a line comment
+/*
+	This is a block comment
+*/
+
+ext putchar(i32 char)
+
+def func(i32 arg)
+	def foo()
+		putchar(100)
+	end
+	putchar(arg)
+	foo()
+end
+
+num = 50 * 2 + 2 - 1
+char = 'U'
+bool = true
+tmp = 99 + i32(bool)
+func(tmp)
+putchar(99)
+putchar(10)
+
+var = num--
+putchar(var)
+putchar('Ä')
+ree = 102
+if num == 100 || ree > 105
+	putchar(97)
+else
+	putchar(100)
+end
+
+i = 0
+loop
+	putchar('R' + i++)
+	if i + 'R' - 1 == 'V' continue
+	putchar('G')
+	if i == 11 break
+end
+
+for i, 0, 10, 2
+	putchar('A' + i)
+end
+putchar('\n')
+
+type Foo
+	i32 a
+	i32 b
+end
+
+foo = Foo()
+foo.a = 'Z'
+putchar(foo.a)
+
+ptrToFooA = &foo.a
+*ptrToFooA = 'Y'
+putchar(foo.a)
+
+arr = [0, 1, 2]
+putchar(10)

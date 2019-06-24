@@ -4,7 +4,7 @@
 
 const Token Token::Null = { "", "" };
 
-const std::string keywords = " ext def if else while loop for break continue true false null ";
+const std::string keywords = " ext def if else while loop for break continue type true false null ";
 
 namespace lexer {
 	InputStream* input;
@@ -30,7 +30,7 @@ namespace lexer {
 	}
 
 	bool is_punc(char ch) {
-		std::string chars = ",;(){}[]'";
+		std::string chars = ".,;(){}[]'";
 		return chars.find(ch) != std::string::npos;
 	}
 

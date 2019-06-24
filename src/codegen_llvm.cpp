@@ -5,9 +5,16 @@
 #define max(l, r) (l > r ? l : r)
 
 namespace codegen {
+	struct StructInfo {
+		std::string name;
+		llvm::StructType* type;
+		std::vector<std::string> membernames;
+		std::map<std::string, llvm::Function*> methods;
+	};
 	struct ModuleData {
 		//std::map<std::string, CodeBlock> blocks;
-		std::map<std::string, llvm::Value*> globals;
+		std::map<std::string, llvm::Constant*> globals;
+		std::map<std::string, StructInfo> types;
 		llvm::Module* llvmMod;
 		llvm::Function* llvmFunc;
 	};
@@ -25,8 +32,31 @@ namespace codegen {
 	std::map<std::string, AST*> moduleList;
 	ModuleData* module;
 	CodeBlock* block;
+	llvm::Value* object;
+	llvm::Value* lastobject;
 
 	llvm::Value* gen_expr(Expression* expr);
+
+	std::string mangle(const std::string& name, StructInfo* parent) {
+		return parent ? "__" + parent->name + "_" + name : name;
+	}
+
+	std::string mangle(const std::string& name, std::vector<llvm::Type*> args) {
+		std::stringstream result;
+		result << "__" << name;
+		for (int i = 0; i < args.size(); i++) {
+			result << "_" << (int)args[i]->getTypeID();
+		}
+		return result.str();
+	}
+
+	std::string mangle(const std::string& name, std::vector<llvm::Value*> args) {
+		std::vector<llvm::Type*> argtypes(args.size());
+		for (int i = 0; i < args.size(); i++) {
+			argtypes[i] = args[i]->getType();
+		}
+		return mangle(name, argtypes);
+	}
 
 	llvm::Value* rval(llvm::Value* val, bool lvalue) {
 		return lvalue ? builder.CreateLoad(val) : val;
@@ -37,6 +67,30 @@ namespace codegen {
 		if (name.length() >= 2 && name[0] == 'i') {
 			int bitsize = std::stoi(name.substr(1));
 			return builder.getIntNTy(bitsize);
+		}
+		if (module->types.count(name)) return module->types[name].type;
+		return nullptr;
+	}
+
+	int member_index(llvm::Type* type, const std::string& name) {
+		for (std::pair<std::string, StructInfo> info : module->types) {
+			if (info.second.type == type) {
+				for (int i = 0; i < info.second.membernames.size(); i++) {
+					if (info.second.membernames[i] == name) {
+						return i;
+					}
+				}
+				// TODO ERROR
+				return -1;
+			}
+		}
+		// TODO ERROR
+		return -1;
+	}
+
+	StructInfo* find_struct_info(llvm::Type* structtype) {
+		for (std::pair<std::string, StructInfo> pair : module->types) {
+			if (pair.second.type == structtype) return &module->types[pair.first];
 		}
 		return nullptr;
 	}
@@ -57,10 +111,22 @@ namespace codegen {
 		// TODO ERROR
 	}
 
-	llvm::Value* find_var(std::string name, CodeBlock* block) {
+	llvm::Value* find_var(std::string name, llvm::Value* parent, CodeBlock* block) {
+		if (parent) {
+			// Member variable
+			int memberid = -1;
+			if ((memberid = member_index(parent->getType()->getPointerElementType(), name)) != -1) {
+				return builder.CreateGEP(parent, { builder.getInt32(0), builder.getInt32(memberid) });
+			}
+			// Member function
+			StructInfo* info = find_struct_info(parent->getType()->getPointerElementType());
+			for (std::pair<std::string, llvm::Function*> pair : info->methods) {
+				if (pair.first == name) return pair.second;
+			}
+		}
 		if (!block) return nullptr;
 		if (block->locals.count(name)) return block->locals[name];
-		if (llvm::Value * val = find_var(name, block->parent)) return val;
+		if (llvm::Value * val = find_var(name, object, block->parent)) return val;
 		if (module->globals.count(name)) return module->globals[name];
 		return nullptr;
 	}
@@ -79,31 +145,62 @@ namespace codegen {
 		return nullptr;
 	}
 
-	llvm::AllocaInst* alloc_var(const std::string& name, llvm::Type* type) {
+	llvm::Function* create_func(Function* func, StructInfo* parent) {
+		std::string funcname = mangle(func->funcname, parent);
+
+		std::vector<llvm::Type*> params;
+		for (int i = 0; i < func->params.size(); i++) {
+			params.push_back(llvm_type(func->params[i].type));
+		}
+		if (parent) params.insert(params.begin(), parent->type->getPointerTo());
+		llvm::FunctionType* funcType = llvm::FunctionType::get(builder.getInt32Ty(), params, false);
+		llvm::Function* llvmfunc = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, funcname, module->llvmMod);
+
+		if (parent) parent->methods.insert(std::make_pair(func->funcname, llvmfunc));
+		else module->globals.insert(std::make_pair(funcname, llvmfunc));
+
+		int i = 0;
+		for (llvm::Argument& arg : llvmfunc->args()) {
+			if (parent && i == 0) arg.setName("this");
+			else arg.setName(func->params[i++].name);
+		}
+
+		if (func->body) {
+			llvm::BasicBlock* parentBlock = builder.GetInsertBlock();
+			llvm::Function* parentFunc = module->llvmFunc;
+			module->llvmFunc = llvmfunc;
+
+			CodeBlock* parent = block;
+			block = new CodeBlock(parent);
+			for (llvm::Argument& arg : llvmfunc->args()) {
+				block->locals.insert(std::make_pair((std::string)arg.getName(), (llvm::AllocaInst*) & arg));
+			}
+
+			llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", llvmfunc);
+			builder.SetInsertPoint(entry);
+
+			gen_expr(func->body);
+			builder.CreateRet(builder.getInt32(0));
+
+			delete block;
+			block = parent;
+
+			module->llvmFunc = parentFunc;
+			builder.SetInsertPoint(parentBlock);
+		}
+
+		return llvmfunc;
+	}
+
+	llvm::AllocaInst* alloc_var(const std::string& name, llvm::Type* type, llvm::Value* arrsize, CodeBlock* block) {
 		llvm::BasicBlock* entry = &module->llvmFunc->getEntryBlock();
 		llvm::IRBuilder<> builder(entry, entry->begin());
-		llvm::AllocaInst* alloc = builder.CreateAlloca(type, nullptr, name);
+		llvm::AllocaInst* alloc = builder.CreateAlloca(type, arrsize, name);
 		block->locals.insert(std::make_pair(name, alloc));
 		return alloc;
 	}
 
-	std::string mangle(const std::string& name, std::vector<llvm::Type*> args) {
-		std::stringstream result;
-		result << "__" << name;
-		for (int i = 0; i < args.size(); i++) {
-			result << "_" << (int)args[i]->getTypeID();
-		}
-		return result.str();
-	}
-
-	std::string mangle(const std::string& name, std::vector<llvm::Value*> args) {
-		std::vector<llvm::Type*> argtypes(args.size());
-		for (int i = 0; i < args.size(); i++) {
-			argtypes[i] = args[i]->getType();
-		}
-		return mangle(name, argtypes);
-	}
-
+	/*
 	llvm::Value* call_func(const std::string& name, std::vector<llvm::Value*> args, CodeBlock* block) {
 		llvm::Value* callee = nullptr;
 		if (callee = find_var(name, block));
@@ -116,6 +213,7 @@ namespace codegen {
 		// TODO ERROR
 		return nullptr;
 	}
+	*/
 
 	void gen_core_defs() {
 	}
@@ -137,7 +235,25 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_ident(Identifier* ident) {
-		return find_var(ident->value, block);
+		return find_var(ident->value, object, block);
+	}
+
+	llvm::Value* gen_array(Array* array) {
+		std::vector<llvm::Value*> elements;
+		llvm::Type* type = builder.getInt32Ty();
+		for (int i = 0; i < array->elements.size(); i++) {
+			llvm::Value* val = rval(gen_expr(array->elements[i]), array->elements[i]->lvalue());
+			if (i == 0) type = val->getType();
+			else val = cast(val, type);
+			elements.push_back(val);
+		}
+		llvm::AllocaInst* alloc = builder.CreateAlloca(llvm::ArrayType::get(type, elements.size()));
+		for (int i = 0; i < elements.size(); i++) {
+			llvm::Value* elementptr = builder.CreateGEP(alloc, builder.getInt32(i));
+			builder.CreateStore(elements[i], elementptr, false);
+		}
+
+		return builder.CreateLoad(alloc);
 	}
 
 	llvm::Value* gen_closure(Closure* cls) {
@@ -145,10 +261,22 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_call(Call* call) {
-		// Cast
-		if (call->func->type == "var" && call->args.size() == 1) {
+		// Cast / Constructor
+		if (call->func->type == "var") {
 			if (llvm::Type * type = llvm_type(((Identifier*)call->func)->value)) {
-				return cast(rval(gen_expr(call->args[0]), call->lvalue()), type);
+				// Cast
+				if (call->args.size() == 1) {
+					return cast(rval(gen_expr(call->args[0]), call->lvalue()), type);
+				}
+				// Constructor
+				if (call->args.size() == 0) {
+					llvm::AllocaInst* alloc = alloc_var("", type, nullptr, block);
+					return builder.CreateLoad(alloc);
+				}
+				else {
+					// TODO assign struct members
+					return nullptr;
+				}
 			}
 		}
 		// Function call
@@ -158,7 +286,42 @@ namespace codegen {
 			llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + i * sizeof(llvm::Argument*);
 			args.push_back(cast(rval(gen_expr(call->args[i]), call->args[i]->lvalue()), arg->getType()));
 		}
+		if (call->func->type == "member") {
+			args.insert(args.begin(), lastobject);
+		}
 		return builder.CreateCall(callee, args);
+	}
+
+	llvm::Value* gen_member(Member* member) {
+		object = gen_expr(member->expr);
+		lastobject = object;
+		llvm::Value* memberptr = gen_expr(member->member);
+		object = nullptr;
+		return memberptr;
+		/*
+		if (member->member->type == "var") {
+			std::string membername = ((Identifier*)member->member)->value;
+			return builder.CreateGEP(expr, { builder.getInt32(0), builder.getInt32(member_index(expr->getType()->getPointerElementType(), membername)) });
+		}
+		*/
+		/*
+		else if (member->member->type == "call") {
+			Call* call = (Call*)member->member;
+			llvm::Type* structtype = expr->getType()->getPointerElementType();
+			StructInfo* info = find_struct_info(structtype);
+			llvm::Value* callee = find_method(structtype, call.)
+				std::vector<llvm::Value*> args;
+			for (int i = 0; i < call->args.size(); i++) {
+				llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + i * sizeof(llvm::Argument*);
+				args.push_back(cast(rval(gen_expr(call->args[i]), call->args[i]->lvalue()), arg->getType()));
+			}
+			return builder.CreateCall(callee, args);
+		}
+		*/
+		//else {
+		// TODO ERROR
+		//return nullptr;
+		//}
 	}
 
 	llvm::Value* gen_if(If* ifexpr) {
@@ -223,6 +386,35 @@ namespace codegen {
 		return builder.getInt32(0);
 	}
 
+	llvm::Value* gen_type(Type* type) {
+		if (llvm_type(type->name)) {
+			// TODO ERROR
+			return nullptr;
+		}
+
+		StructInfo info;
+		info.name = type->name;
+
+		std::vector<llvm::Type*> elements;
+		std::vector<std::string> members;
+		for (int i = 0; i < type->elements.size(); i++) {
+			elements.push_back(llvm_type(std::get<0>(type->elements[i])));
+			members.push_back(std::get<1>(type->elements[i]));
+		}
+		info.membernames = members;
+		info.type = llvm::StructType::create(elements, type->name, false);
+		module->types.insert(std::make_pair(type->name, info));
+
+		std::map<std::string, llvm::Function*> methods;
+		for (int i = 0; i < type->methods.size(); i++) {
+			Function* method = type->methods[i];
+			methods.insert(std::make_pair(method->funcname, create_func(method, &info)));
+		}
+		module->types[type->name].methods = methods;
+
+		return nullptr;
+	}
+
 	llvm::Value* gen_binary(const std::string& op, llvm::Value* left, llvm::Value* right) {
 		if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
 			llvm::Type* type = builder.getIntNTy(max(left->getType()->getIntegerBitWidth(), right->getType()->getIntegerBitWidth()));
@@ -242,7 +434,9 @@ namespace codegen {
 			if (op == "&&") return builder.CreateAnd(left, right);
 			if (op == "||") return builder.CreateOr(left, right);
 		}
-		return call_func(op, { left, right }, block);
+		//return call_func(op, { left, right }, block);
+		// TODO ERROR
+		return nullptr;
 	}
 
 	llvm::Value* gen_assign(Assign* assign) {
@@ -250,7 +444,7 @@ namespace codegen {
 		llvm::Value* right = gen_expr(assign->right);
 		if (assign->op == "=" && !left) {
 			if (assign->left->lvalue()) {
-				left = alloc_var(((Identifier*)assign->left)->value, assign->right->lvalue() ? right->getType()->getPointerElementType() : right->getType());
+				left = alloc_var(((Identifier*)assign->left)->value, assign->right->lvalue() ? right->getType()->getPointerElementType() : right->getType(), nullptr, block);
 			}
 			else {
 				// TODO ERROR
@@ -276,6 +470,8 @@ namespace codegen {
 
 	llvm::Value* gen_unary(Unary* unary) {
 		llvm::Value* expr = gen_expr(unary->expr);
+
+
 
 		if (unary->op == "++") {
 			llvm::Value* val = builder.CreateLoad(expr);
@@ -339,58 +535,8 @@ namespace codegen {
 		return gen_ast(prog->ast);
 	}
 
-	llvm::Value* gen_func(Function* func) {
-		std::vector<llvm::Type*> params;
-		for (int i = 0; i < func->params.size(); i++) {
-			params.push_back(llvm_type(func->params[i].type));
-		}
-		llvm::FunctionType* funcType = llvm::FunctionType::get(builder.getInt32Ty(), params, false);
-		llvm::Function* llvmfunc = llvm::Function::Create(funcType, llvm::GlobalValue::ExternalLinkage, func->funcname, module->llvmMod);
-		module->globals.insert(std::make_pair(func->funcname, llvmfunc));
-		int i = 0;
-		for (llvm::Argument& arg : llvmfunc->args()) {
-			arg.setName(func->params[i++].name);
-		}
-		if (func->body) {
-			llvm::BasicBlock* parentBlock = builder.GetInsertBlock();
-			llvm::Function* parentFunc = module->llvmFunc;
-			module->llvmFunc = llvmfunc;
-
-			CodeBlock* parent = block;
-			block = new CodeBlock(parent);
-			for (llvm::Argument& arg : llvmfunc->args()) {
-				block->locals.insert(std::make_pair((std::string)arg.getName(), (llvm::AllocaInst*) & arg));
-			}
-
-			llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", llvmfunc);
-			builder.SetInsertPoint(entry);
-
-			gen_expr(func->body);
-			builder.CreateRet(builder.getInt32(0));
-
-			/*
-			for (llvm::BasicBlock& block : llvmfunc->getBasicBlockList()) {
-				bool terminated = false;
-				for (llvm::Instruction& inst : block.getInstList()) {
-					if (inst.getType()->getTypeID() == llvm::Instruction::Br) {
-						__debugbreak();
-						terminated = true;
-					}
-					else if (terminated) {
-						block.getInstList().remove(inst);
-					}
-				}
-			}
-			*/
-
-			delete block;
-			block = parent;
-
-			module->llvmFunc = parentFunc;
-			builder.SetInsertPoint(parentBlock);
-		}
-
-		return llvmfunc;
+	llvm::Function* gen_func(Function* func) {
+		return create_func(func, nullptr);
 	}
 
 	llvm::Value* gen_expr(Expression* expr) {
@@ -402,8 +548,11 @@ namespace codegen {
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
 		if (expr->type == "if") return gen_if((If*)expr);
 		if (expr->type == "loop") return gen_loop((Loop*)expr);
+		if (expr->type == "type") return gen_type((Type*)expr);
 		if (expr->type == "call") return gen_call((Call*)expr);
+		if (expr->type == "member") return gen_member((Member*)expr);
 		if (expr->type == "cls") return gen_closure((Closure*)expr);
+		if (expr->type == "arr") return gen_array((Array*)expr);
 		if (expr->type == "var") return gen_ident((Identifier*)expr);
 		if (expr->type == "bool") return gen_bool((Boolean*)expr);
 		if (expr->type == "str") return gen_str((String*)expr);

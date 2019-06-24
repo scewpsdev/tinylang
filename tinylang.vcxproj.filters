@@ -18,6 +18,7 @@
     <None Include="test\main.s" />
     <None Include="test\syntax.sn" />
     <None Include="test\main.sn" />
+    <None Include="test\test.sn" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\input.cpp">

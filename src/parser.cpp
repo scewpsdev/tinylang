@@ -9,6 +9,7 @@ namespace parser {
 
 	Lexer* input;
 
+	Function* parse_func();
 	Expression* parse_atom();
 	Expression* parse_expr();
 	Expression* parse_prog();
@@ -56,10 +57,10 @@ namespace parser {
 			if (tokprec > prec) {
 				input->next();
 				if (tok.value == "=" || tok.value.length() == 2 && (std::string("+-*/%").find(tok.value[0]) != std::string::npos) && tok.value[1] == '=') {
-					return maybe_unary(maybe_binary(new Assign(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec));
+					return maybe_unary(maybe_binary(new Assign(tok.value, left, maybe_binary(maybe_unary(parse_atom()), tokprec)), prec));
 				}
 				else
-					return maybe_unary(maybe_binary(new Binary(tok.value, left, maybe_binary(parse_atom(), tokprec)), prec));
+					return maybe_unary(maybe_binary(new Binary(tok.value, left, maybe_binary(maybe_unary(parse_atom()), tokprec)), prec));
 			}
 		}
 		return left;
@@ -69,7 +70,7 @@ namespace parser {
 	std::vector<T> delimited(char start, char end, char separator, T(*parser)()) {
 		std::vector<T> list;
 		bool first = true;
-		skip_punc(start);
+		if (start) skip_punc(start);
 		while (!input->eof()) {
 			if (is_punc(end)) break;
 			if (first) first = false;
@@ -85,22 +86,37 @@ namespace parser {
 		return new Boolean(input->next().value == "true");
 	}
 
-	std::string parse_varname() {
+	std::string parse_ident() {
 		Token name = input->next();
 		if (name.type != "var") input->error("Variable name expected");
 		return name.value;
 	}
 
+	Array* parse_array() {
+		return new Array(delimited('[', ']', ',', parse_expr));
+	}
+
 	Closure* parse_closure() {
-		return new Closure(delimited('(', ')', ',', parse_varname), parse_prog());
+		return new Closure(delimited('(', ')', ',', parse_ident), parse_prog());
 	}
 
 	Call* parse_call(Expression* func) {
 		return new Call(func, delimited('(', ')', ',', parse_expr));
 	}
 
+	Member* parse_member(Expression* expr) {
+		skip_punc('.');
+		Expression* member = parse_atom();
+		return new Member(expr, member);
+		/*
+		std::string name = input->next().value;
+		return new Member(expr, name);
+		*/
+	}
+
 	Expression* maybe_unary(Expression* e) {
 		if (is_punc('(')) return parse_call(e);
+		if (is_punc('.')) return maybe_unary(parse_member(e));
 		if (is_op("++")) {
 			skip_op("++");
 			return new Unary("++", true, e);
@@ -201,6 +217,33 @@ namespace parser {
 		return nullptr;
 	}
 
+	std::tuple<std::string, std::string> parse_element() {
+		Token type = input->next();
+		if (type.type != "var") input->error("Type name expected");
+		Token name = input->next();
+		if (name.type != "var") input->error("Variable name expected");
+		return std::make_tuple(type.value, name.value);
+	}
+
+	Type* parse_type() {
+		skip_kw("type");
+		std::string name = input->next().value;
+		skip_punc('{');
+
+		// Member variables
+		std::vector<std::tuple<std::string, std::string>> elements = delimited(0, ';', ',', parse_element);
+
+		// Member functions
+		std::vector<Function*> methods;
+		while (is_kw("def")) {
+			Function* func = parse_func();
+			methods.push_back(func);
+		}
+
+		skip_punc('}');
+		return new Type(name, elements, methods);
+	}
+
 	Parameter parse_param() {
 		std::string type = "";
 		std::string name = "";
@@ -215,14 +258,14 @@ namespace parser {
 		return Parameter(type, name);
 	}
 
-	Expression* parse_ext() {
+	Function* parse_ext() {
 		skip_kw("ext");
 		Token funcname = input->next();
 		if (funcname.type != "var") input->error("Function name expected");
 		return new Function(funcname.value, delimited('(', ')', ',', parse_param), nullptr);
 	}
 
-	Expression* parse_func() {
+	Function* parse_func() {
 		input->next();
 		Token tok = input->next();
 		std::string funcname = tok.value;
@@ -233,41 +276,43 @@ namespace parser {
 	}
 
 	Expression* parse_atom() {
-		return maybe_unary([]() -> Expression * {
-			if (is_kw("ext")) return parse_ext();
-			if (is_kw("def")) return parse_func();
-			if (is_punc('(')) {
-				input->next();
-				Expression* expr = parse_expr();
-				skip_punc(')');
-				return expr;
-			}
-			if (is_punc('{')) return parse_prog();
-			if (is_op("++") || is_op("--") || is_op("!") || is_op("&") || is_op("*")) {
-				std::string op = input->next().value;
-				return new Unary(op, false, parse_atom());
-			}
-			if (is_kw("if")) return parse_if();
-			if (is_kw("loop")) return parse_loop();
-			if (is_kw("while")) return parse_while();
-			if (is_kw("for")) return parse_for();
-			if (is_kw("true") || is_kw("false")) return parse_bool();
-			if (is_kw("cls")) {
-				input->next();
-				return parse_closure();
-			}
-			Token tok = input->next();
-			if (tok.type == "kw") {
-				if (tok.value == "break") return new Break();
-				if (tok.value == "continue") return new Continue();
-			}
-			if (tok.type == "var") return new Identifier(tok.value);
-			if (tok.type == "num") return new Number(std::stoi(tok.value));
-			if (tok.type == "char") return new Character((int)tok.value[0]);
-			if (tok.type == "str") return new String(tok.value);
-			unexpected();
-			return nullptr;
-		});
+		//return maybe_unary([]() -> Expression * {
+		if (is_kw("ext")) return parse_ext();
+		if (is_kw("def")) return parse_func();
+		if (is_punc('(')) {
+			input->next();
+			Expression* expr = parse_expr();
+			skip_punc(')');
+			return expr;
+		}
+		if (is_punc('{')) return parse_prog();
+		if (is_punc('[')) return parse_array();
+		if (is_op("++") || is_op("--") || is_op("!") || is_op("&") || is_op("*")) {
+			std::string op = input->next().value;
+			return new Unary(op, false, maybe_unary(parse_atom()));
+		}
+		if (is_kw("if")) return parse_if();
+		if (is_kw("loop")) return parse_loop();
+		if (is_kw("while")) return parse_while();
+		if (is_kw("for")) return parse_for();
+		if (is_kw("true") || is_kw("false")) return parse_bool();
+		if (is_kw("cls")) {
+			input->next();
+			return parse_closure();
+		}
+		if (is_kw("type")) return parse_type();
+		Token tok = input->next();
+		if (tok.type == "kw") {
+			if (tok.value == "break") return new Break();
+			if (tok.value == "continue") return new Continue();
+		}
+		if (tok.type == "var") return new Identifier(tok.value);
+		if (tok.type == "num") return new Number(std::stoi(tok.value));
+		if (tok.type == "char") return new Character((int)tok.value[0]);
+		if (tok.type == "str") return new String(tok.value);
+		unexpected();
+		return nullptr;
+		//});
 	}
 
 	Expression* parse_expr() {

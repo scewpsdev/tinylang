@@ -6,12 +6,14 @@
 /*
 	TODO
 	//- while loops
-	- references
+	//- references
 	- arrays
-	- structs
+	//- structs
 	- strings
-	- for loops
+	//- for loops
 	- modules
+	- floats
+	- hex, binary literals
 */
 
 ext putchar(i32 char);
@@ -54,26 +56,38 @@ loop {
 
 */
 
+/*
 for 10 {
 	putchar('0' + __it);
-}
+};
 for i, 10 {
 	putchar('A' + i);
-}
+};
 for i, 2, 10 {
 	putchar('0' + i);
-}
+};
 for i, 0, 10, 2 {
 	putchar('A' + i);
 };
 putchar(10);
-
-test = 'A';
-ptrToTest = &test;
-putchar(test);
-*ptrToTest = 'B';
-putchar(test);
-/*
 */
+
+type Foo {
+	i32 a,
+	i32 b;
+
+	def doStuff() {
+		this.a--;
+		putchar('0');
+		putchar('1');
+		putchar('2');
+	}
+};
+
+foo = Foo();
+foo.a = 'Z';
+putchar(foo.a);
+foo.doStuff();
+putchar(foo.a);
 
 putchar(10);

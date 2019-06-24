@@ -6,6 +6,7 @@ namespace printer {
 	AST* input;
 	int numIndents = 0;
 
+	void print_func(Function* func, std::ostream& out);
 	void print_expr(Expression* expr, std::ostream& out);
 	void print_ast(AST* ast, std::ostream& out);
 
@@ -33,6 +34,15 @@ namespace printer {
 		out << ident->value;
 	}
 
+	void print_array(Array* array, std::ostream& out) {
+		out << "[ ";
+		for (int i = 0; i < array->elements.size(); i++) {
+			print_expr(array->elements[i], out);
+			out << (i < array->elements.size() - 1 ? ", " : "");
+		}
+		out << " ]";
+	}
+
 	void print_closure(Closure* cls, std::ostream& out) {
 		out << "(";
 		for (int i = 0; i < cls->args.size(); i++) {
@@ -51,6 +61,12 @@ namespace printer {
 			if (i < call->args.size() - 1) out << ", ";
 		}
 		out << ")";
+	}
+
+	void print_member(Member* member, std::ostream& out) {
+		print_expr(member->expr, out);
+		out << ".";
+		print_expr(member->member, out);
 	}
 
 	void print_if(If* ifexpr, std::ostream& out) {
@@ -77,6 +93,18 @@ namespace printer {
 		}
 		out << " ";
 		print_expr(loop->body, out);
+	}
+
+	void print_type(Type* type, std::ostream& out) {
+		out << "type " << type->name << " {" << std::endl;
+		for (int i = 0; i < type->elements.size(); i++) {
+			out << std::get<0>(type->elements[i]) << " " << std::get<1>(type->elements[i]) << (i < type->elements.size() - 1 ? "," : ";") << std::endl;
+		}
+		for (int i = 0; i < type->methods.size(); i++) {
+			print_func(type->methods[i], out);
+			out << ";" << std::endl;
+		}
+		out << "}";
 	}
 
 	void print_assign(Assign* assign, std::ostream& out) {
@@ -119,7 +147,7 @@ namespace printer {
 		out << param->type << " " << param->name;
 	}
 
-	void print_function(Function* func, std::ostream& out) {
+	void print_func(Function* func, std::ostream& out) {
 		out << (func->body ? "def " : "ext ") << func->funcname << "(";
 		for (int i = 0; i < func->params.size(); i++) {
 			print_param(&func->params[i], out);
@@ -137,14 +165,17 @@ namespace printer {
 		if (expr->type == "assign") print_assign((Assign*)expr, out);
 		if (expr->type == "if") print_if((If*)expr, out);
 		if (expr->type == "loop") print_loop((Loop*)expr, out);
+		if (expr->type == "type") print_type((Type*)expr, out);
 		if (expr->type == "call") print_call((Call*)expr, out);
+		if (expr->type == "member") print_member((Member*)expr, out);
 		if (expr->type == "cls") print_closure((Closure*)expr, out);
+		if (expr->type == "arr") print_array((Array*)expr, out);
 		if (expr->type == "var") print_ident((Identifier*)expr, out);
 		if (expr->type == "bool") print_bool((Boolean*)expr, out);
 		if (expr->type == "str") print_str((String*)expr, out);
 		if (expr->type == "num") print_num((Number*)expr, out);
 		if (expr->type == "char") print_char((Character*)expr, out);
-		if (expr->type == "func") print_function((Function*)expr, out);
+		if (expr->type == "func") print_func((Function*)expr, out);
 	}
 
 	void print_ast(AST* ast, std::ostream& out) {

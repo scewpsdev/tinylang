@@ -71,6 +71,14 @@ public:
 	}
 };
 
+class Array : public Expression {
+public:
+	std::vector<Expression*> elements;
+public:
+	Array(std::vector<Expression*> elements)
+		: Expression("arr"), elements(elements) {}
+};
+
 class Call : public Expression {
 public:
 	Expression* func;
@@ -85,6 +93,19 @@ public:
 			args[i] = nullptr;
 		}
 	}
+};
+
+class Member : public Expression {
+public:
+	Expression* expr;
+	Expression* member;
+public:
+	Member(Expression* expr, Expression* member)
+		: Expression("member"), expr(expr), member(member) {}
+	~Member() {
+		delete expr; expr = nullptr;
+	}
+	virtual bool lvalue() override { return true; }
 };
 
 class If : public Expression {
@@ -177,6 +198,16 @@ public:
 	Continue()
 		: Expression("continue") {}
 	~Continue() {}
+};
+
+class Type : public Expression {
+public:
+	std::string name;
+	std::vector<std::tuple<std::string, std::string>> elements;
+	std::vector<class Function*> methods;
+public:
+	Type(const std::string& name, std::vector<std::tuple<std::string, std::string>> types, std::vector<Function*> methods)
+		: Expression("type"), name(name), elements(types), methods(methods) {}
 };
 
 class Function : public Expression {
