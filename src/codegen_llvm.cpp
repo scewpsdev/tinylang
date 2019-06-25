@@ -162,7 +162,8 @@ namespace codegen {
 		int i = 0;
 		for (llvm::Argument& arg : llvmfunc->args()) {
 			if (parent && i == 0) arg.setName("this");
-			else arg.setName(func->params[i++].name);
+			else arg.setName(func->params[i - (parent ? 1 : 0)].name);
+			i++;
 		}
 
 		if (func->body) {
