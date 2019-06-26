@@ -87,4 +87,7 @@ putchar(foo.a);
 foo.doStuff(5);
 putchar(foo.a);
 
+a = [0, 48, 2];
+putchar(a[1]);
+
 putchar(10);

@@ -104,6 +104,10 @@ namespace parser {
 		return new Call(func, delimited('(', ')', ',', parse_expr));
 	}
 
+	Index* parse_index(Expression* expr) {
+		return new Index(expr, delimited('[', ']', ',', parse_expr));
+	}
+
 	Member* parse_member(Expression* expr) {
 		skip_punc('.');
 		Expression* member = parse_atom();
@@ -115,7 +119,8 @@ namespace parser {
 	}
 
 	Expression* maybe_unary(Expression* e) {
-		if (is_punc('(')) return parse_call(e);
+		if (is_punc('(')) return maybe_unary(parse_call(e));
+		if (is_punc('[')) return maybe_unary(parse_index(e));
 		if (is_punc('.')) return maybe_unary(parse_member(e));
 		if (is_op("++")) {
 			skip_op("++");

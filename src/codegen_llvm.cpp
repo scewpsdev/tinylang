@@ -251,7 +251,7 @@ namespace codegen {
 			else val = cast(val, type);
 			elements.push_back(val);
 		}
-		llvm::AllocaInst* alloc = builder.CreateAlloca(llvm::ArrayType::get(type, elements.size()));
+		llvm::AllocaInst* alloc = builder.CreateAlloca(type, builder.getInt32(elements.size()));
 		for (int i = 0; i < elements.size(); i++) {
 			llvm::Value* elementptr = builder.CreateGEP(alloc, builder.getInt32(i));
 			builder.CreateStore(elements[i], elementptr, false);
@@ -308,6 +308,16 @@ namespace codegen {
 		}
 		*/
 		return builder.CreateCall(callee, args);
+	}
+
+	llvm::Value* gen_index(Index* idx) {
+		if (idx->args.size() != 1) {
+			// TODO ERROR
+			return nullptr;
+		}
+		llvm::Value* expr = gen_expr(idx->expr);
+		llvm::Value* index = gen_expr(idx->args[0]);
+		return builder.CreateGEP(expr, index);
 	}
 
 	llvm::Value* gen_member(Member* member) {
@@ -568,6 +578,7 @@ namespace codegen {
 		if (expr->type == "loop") return gen_loop((Loop*)expr);
 		if (expr->type == "type") return gen_type((Type*)expr);
 		if (expr->type == "call") return gen_call((Call*)expr);
+		if (expr->type == "idx") return gen_index((Index*)expr);
 		if (expr->type == "member") return gen_member((Member*)expr);
 		if (expr->type == "cls") return gen_closure((Closure*)expr);
 		if (expr->type == "arr") return gen_array((Array*)expr);

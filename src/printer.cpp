@@ -63,6 +63,16 @@ namespace printer {
 		out << ")";
 	}
 
+	void print_index(Index* idx, std::ostream& out) {
+		print_expr(idx->expr, out);
+		out << "[";
+		for (int i = 0; i < idx->args.size(); i++) {
+			print_expr(idx->args[i], out);
+			if (i < idx->args.size() - 1) out << ", ";
+		}
+		out << "]";
+	}
+
 	void print_member(Member* member, std::ostream& out) {
 		print_expr(member->expr, out);
 		out << ".";
@@ -167,6 +177,7 @@ namespace printer {
 		if (expr->type == "loop") print_loop((Loop*)expr, out);
 		if (expr->type == "type") print_type((Type*)expr, out);
 		if (expr->type == "call") print_call((Call*)expr, out);
+		if (expr->type == "idx") print_index((Index*)expr, out);
 		if (expr->type == "member") print_member((Member*)expr, out);
 		if (expr->type == "cls") print_closure((Closure*)expr, out);
 		if (expr->type == "arr") print_array((Array*)expr, out);

@@ -89,10 +89,25 @@ public:
 	~Call() {
 		delete func; func = nullptr;
 		for (int i = 0; i < args.size(); i++) {
-			delete args[i];
-			args[i] = nullptr;
+			delete args[i]; args[i] = nullptr;
 		}
 	}
+};
+
+class Index : public Expression {
+public:
+	Expression* expr;
+	std::vector<Expression*> args;
+public:
+	Index(Expression* expr, std::vector<Expression*> args)
+		: Expression("idx"), expr(expr), args(args) {}
+	~Index() {
+		delete expr; expr = nullptr;
+		for (int i = 0; i < args.size(); i++) {
+			delete args[i]; args[i] = nullptr;
+		}
+	}
+	virtual bool lvalue() override { return true; }
 };
 
 class Member : public Expression {
