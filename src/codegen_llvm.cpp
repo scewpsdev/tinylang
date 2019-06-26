@@ -62,14 +62,14 @@ namespace codegen {
 		return lvalue ? builder.CreateLoad(val) : val;
 	}
 
-	llvm::Type* llvm_type(std::string name) {
-		// TODO
-		if (name.length() >= 2 && name[0] == 'i') {
-			int bitsize = std::stoi(name.substr(1));
-			return builder.getIntNTy(bitsize);
+	llvm::Type* llvm_type(Typename type) {
+		llvm::Type* t = nullptr;
+		if (type.name.length() >= 2 && type.name[0] == 'i') {
+			int bitsize = std::stoi(type.name.substr(1));
+			t = builder.getIntNTy(bitsize);
 		}
-		if (module->types.count(name)) return module->types[name].type;
-		return nullptr;
+		if (module->types.count(type.name)) t = module->types[type.name].type;
+		return type.pointer ? t->getPointerTo() : t;
 	}
 
 	int member_index(llvm::Type* type, const std::string& name) {
@@ -158,7 +158,7 @@ namespace codegen {
 
 		std::vector<llvm::Type*> params;
 		for (int i = 0; i < func->params.size(); i++) {
-			params.push_back(llvm_type(func->params[i].type));
+			params.push_back(llvm_type(std::get<0>(func->params[i])));
 		}
 		if (parent) params.insert(params.begin(), parent->type->getPointerTo());
 		llvm::FunctionType* funcType = llvm::FunctionType::get(builder.getInt32Ty(), params, false);
@@ -170,7 +170,7 @@ namespace codegen {
 		int i = 0;
 		for (llvm::Argument& arg : llvmfunc->args()) {
 			if (parent && i == 0) arg.setName("this");
-			else arg.setName(func->params[i - (parent ? 1 : 0)].name);
+			else arg.setName(std::get<1>(func->params[i - (parent ? 1 : 0)]));
 			i++;
 		}
 
@@ -256,8 +256,8 @@ namespace codegen {
 			llvm::Value* elementptr = builder.CreateGEP(alloc, builder.getInt32(i));
 			builder.CreateStore(elements[i], elementptr, false);
 		}
-
-		return builder.CreateLoad(alloc);
+		return alloc;
+		//return builder.CreateLoad(alloc);
 	}
 
 	llvm::Value* gen_closure(Closure* cls) {
@@ -265,14 +265,9 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_call(Call* call) {
-		// Cast / Constructor
+		// Constructor
 		if (call->func->type == "var") {
-			if (llvm::Type * type = llvm_type(((Identifier*)call->func)->value)) {
-				// Cast
-				if (call->args.size() == 1) {
-					return cast(rval(gen_expr(call->args[0]), call->lvalue()), type);
-				}
-				// Constructor
+			if (llvm::Type * type = llvm_type(Typename{ ((Identifier*)call->func)->value, false })) {
 				if (call->args.size() == 0) {
 					llvm::AllocaInst* alloc = alloc_var("", type, nullptr, block);
 					return builder.CreateLoad(alloc);
@@ -315,9 +310,10 @@ namespace codegen {
 			// TODO ERROR
 			return nullptr;
 		}
-		llvm::Value* expr = gen_expr(idx->expr);
+		llvm::Value* expr = rval(gen_expr(idx->expr), idx->expr->lvalue());
 		llvm::Value* index = gen_expr(idx->args[0]);
-		return builder.CreateGEP(expr, index);
+		llvm::Value* alloc = builder.CreateGEP(expr, index);
+		return alloc;
 	}
 
 	llvm::Value* gen_member(Member* member) {
@@ -350,6 +346,10 @@ namespace codegen {
 		// TODO ERROR
 		//return nullptr;
 		//}
+	}
+
+	llvm::Value* gen_cast(Cast* c) {
+		return cast(rval(gen_expr(c->expr), c->expr->lvalue()), llvm_type(c->t));
 	}
 
 	llvm::Value* gen_if(If* ifexpr) {
@@ -414,8 +414,8 @@ namespace codegen {
 		return builder.getInt32(0);
 	}
 
-	llvm::Value* gen_type(Type* type) {
-		if (llvm_type(type->name)) {
+	llvm::Value* gen_type(Class* type) {
+		if (llvm_type(Typename{ type->name, false })) {
 			// TODO ERROR
 			return nullptr;
 		}
@@ -576,10 +576,11 @@ namespace codegen {
 		if (expr->type == "assign") return gen_assign((Assign*)expr);
 		if (expr->type == "if") return gen_if((If*)expr);
 		if (expr->type == "loop") return gen_loop((Loop*)expr);
-		if (expr->type == "type") return gen_type((Type*)expr);
+		if (expr->type == "class") return gen_type((Class*)expr);
 		if (expr->type == "call") return gen_call((Call*)expr);
 		if (expr->type == "idx") return gen_index((Index*)expr);
 		if (expr->type == "member") return gen_member((Member*)expr);
+		if (expr->type == "cast") return gen_cast((Cast*)expr);
 		if (expr->type == "cls") return gen_closure((Closure*)expr);
 		if (expr->type == "arr") return gen_array((Array*)expr);
 		if (expr->type == "var") return gen_ident((Identifier*)expr);
@@ -597,7 +598,7 @@ namespace codegen {
 
 		gen_core_defs();
 
-		Function mainFunc("mainCRTStartup", std::vector<Parameter>(), new Program(ast));
+		Function mainFunc("mainCRTStartup", std::vector<std::tuple<Typename, std::string>>(), new Program(ast));
 		gen_func(&mainFunc);
 
 		// Generate binary

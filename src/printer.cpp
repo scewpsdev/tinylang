@@ -105,10 +105,15 @@ namespace printer {
 		print_expr(loop->body, out);
 	}
 
-	void print_type(Type* type, std::ostream& out) {
+	void print_type_and_name(std::tuple<Typename, std::string> t, std::ostream& out) {
+		out << std::get<0>(t).name << (std::get<0>(t).pointer ? "*" : "") << " " << std::get<1>(t);
+	}
+
+	void print_class(Class* type, std::ostream& out) {
 		out << "type " << type->name << " {" << std::endl;
 		for (int i = 0; i < type->elements.size(); i++) {
-			out << std::get<0>(type->elements[i]) << " " << std::get<1>(type->elements[i]) << (i < type->elements.size() - 1 ? "," : ";") << std::endl;
+			print_type_and_name(type->elements[i], out);
+			out << (i < type->elements.size() - 1 ? "," : ";") << std::endl;
 		}
 		for (int i = 0; i < type->methods.size(); i++) {
 			print_func(type->methods[i], out);
@@ -153,14 +158,10 @@ namespace printer {
 		out << indent() << "}";
 	}
 
-	void print_param(Parameter* param, std::ostream& out) {
-		out << param->type << " " << param->name;
-	}
-
 	void print_func(Function* func, std::ostream& out) {
 		out << (func->body ? "def " : "ext ") << func->funcname << "(";
 		for (int i = 0; i < func->params.size(); i++) {
-			print_param(&func->params[i], out);
+			print_type_and_name(func->params[i], out);
 		}
 		out << ")";
 		if (func->body) print_expr(func->body, out);
@@ -175,7 +176,7 @@ namespace printer {
 		if (expr->type == "assign") print_assign((Assign*)expr, out);
 		if (expr->type == "if") print_if((If*)expr, out);
 		if (expr->type == "loop") print_loop((Loop*)expr, out);
-		if (expr->type == "type") print_type((Type*)expr, out);
+		if (expr->type == "class") print_class((Class*)expr, out);
 		if (expr->type == "call") print_call((Call*)expr, out);
 		if (expr->type == "idx") print_index((Index*)expr, out);
 		if (expr->type == "member") print_member((Member*)expr, out);

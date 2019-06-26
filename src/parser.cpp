@@ -92,6 +92,18 @@ namespace parser {
 		return name.value;
 	}
 
+	Typename parse_typename() {
+		Typename type;
+		Token nametok = input->next();
+		if (nametok.type != "var") input->error("Type name expected");
+		type.name = nametok.value;
+		if (is_punc('*')) {
+			skip_punc('*');
+			type.pointer = true;
+		}
+		return type;
+	}
+
 	Array* parse_array() {
 		return new Array(delimited('[', ']', ',', parse_expr));
 	}
@@ -222,21 +234,20 @@ namespace parser {
 		return nullptr;
 	}
 
-	std::tuple<std::string, std::string> parse_element() {
-		Token type = input->next();
-		if (type.type != "var") input->error("Type name expected");
+	std::tuple<Typename, std::string> parse_type_and_name() {
+		Typename type = parse_typename();
 		Token name = input->next();
 		if (name.type != "var") input->error("Variable name expected");
-		return std::make_tuple(type.value, name.value);
+		return std::make_tuple(type, name.value);
 	}
 
-	Type* parse_type() {
-		skip_kw("type");
+	Class* parse_type() {
+		skip_kw("class");
 		std::string name = input->next().value;
 		skip_punc('{');
 
 		// Member variables
-		std::vector<std::tuple<std::string, std::string>> elements = delimited(0, ';', ',', parse_element);
+		std::vector<std::tuple<Typename, std::string>> elements = delimited(0, ';', ',', parse_type_and_name);
 
 		// Member functions
 		std::vector<Function*> methods;
@@ -246,36 +257,31 @@ namespace parser {
 		}
 
 		skip_punc('}');
-		return new Type(name, elements, methods);
+		return new Class(name, elements, methods);
 	}
 
-	Parameter parse_param() {
-		std::string type = "";
-		std::string name = "";
-		Token typetok = input->next();
-		type = typetok.value;
-		if (typetok.type != "var") input->error("Type name expected");
-		if (input->peek().type == "var") {
-			Token nametok = input->next();
-			name = nametok.value;
-			if (nametok.type != "var") input->error("Variable name expected");
-		}
-		return Parameter(type, name);
+	Cast* parse_typecast() {
+		skip_op("<");
+		std::string type = input->next().value;
+		bool pointer = is_op("*");
+		if (pointer) skip_op("*");
+		skip_op(">");
+		Expression* expr = parse_expr();
+		return new Cast(expr, Typename{ type, pointer });
 	}
 
 	Function* parse_ext() {
 		skip_kw("ext");
 		Token funcname = input->next();
 		if (funcname.type != "var") input->error("Function name expected");
-		return new Function(funcname.value, delimited('(', ')', ',', parse_param), nullptr);
+		return new Function(funcname.value, delimited('(', ')', ',', parse_type_and_name), nullptr);
 	}
 
 	Function* parse_func() {
 		input->next();
 		Token tok = input->next();
 		std::string funcname = tok.value;
-		std::vector<Parameter> params;
-		if (is_punc('(')) params = delimited('(', ')', ',', parse_param);
+		auto params = delimited('(', ')', ',', parse_type_and_name);
 		Expression* body = parse_expr();
 		return new Function(funcname, params, body);
 	}
@@ -290,6 +296,7 @@ namespace parser {
 			skip_punc(')');
 			return expr;
 		}
+		if (is_op("<")) return parse_typecast();
 		if (is_punc('{')) return parse_prog();
 		if (is_punc('[')) return parse_array();
 		if (is_op("++") || is_op("--") || is_op("!") || is_op("&") || is_op("*")) {
@@ -305,7 +312,7 @@ namespace parser {
 			input->next();
 			return parse_closure();
 		}
-		if (is_kw("type")) return parse_type();
+		if (is_kw("class")) return parse_type();
 		Token tok = input->next();
 		if (tok.type == "kw") {
 			if (tok.value == "break") return new Break();

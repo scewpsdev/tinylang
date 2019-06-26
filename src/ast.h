@@ -50,13 +50,9 @@ public:
 	virtual bool lvalue() override { return true; }
 };
 
-class Parameter {
-public:
-	std::string type;
-	std::string name;
-public:
-	Parameter(const std::string& type, const std::string& name)
-		: type(type), name(name) {}
+struct Typename {
+	std::string name = "";
+	bool pointer = false;
 };
 
 class Closure : public Expression {
@@ -121,6 +117,18 @@ public:
 		delete expr; expr = nullptr;
 	}
 	virtual bool lvalue() override { return true; }
+};
+
+class Cast : public Expression {
+public:
+	Expression* expr;
+	Typename t;
+public:
+	Cast(Expression* expr, Typename type)
+		: Expression("cast"), expr(expr), t(type) {}
+	~Cast() {
+		delete expr; expr = nullptr;
+	}
 };
 
 class If : public Expression {
@@ -215,23 +223,23 @@ public:
 	~Continue() {}
 };
 
-class Type : public Expression {
+class Class : public Expression {
 public:
 	std::string name;
-	std::vector<std::tuple<std::string, std::string>> elements;
+	std::vector<std::tuple<Typename, std::string>> elements;
 	std::vector<class Function*> methods;
 public:
-	Type(const std::string& name, std::vector<std::tuple<std::string, std::string>> types, std::vector<Function*> methods)
-		: Expression("type"), name(name), elements(types), methods(methods) {}
+	Class(const std::string& name, std::vector<std::tuple<Typename, std::string>> types, std::vector<Function*> methods)
+		: Expression("class"), name(name), elements(types), methods(methods) {}
 };
 
 class Function : public Expression {
 public:
 	std::string funcname;
-	std::vector<Parameter> params;
+	std::vector<std::tuple<Typename, std::string>> params;
 	Expression* body;
 public:
-	Function(const std::string& funcname, std::vector<Parameter> args, Expression* body)
+	Function(const std::string& funcname, std::vector<std::tuple<Typename, std::string>> args, Expression* body)
 		: Expression("func"), funcname(funcname), params(args), body(body) {}
 	~Function() {
 		delete body; body = nullptr;

@@ -30,7 +30,7 @@ def func(i32 arg) {
 num = 50 * 2 + 2 - 1;
 char = 'U';
 bool = true;
-tmp = 99 + i32(bool);
+tmp = 99 + (bool);
 func(tmp);
 putchar(99);
 putchar(10);
@@ -70,7 +70,6 @@ for i, 0, 10, 2 {
 	putchar('A' + i);
 };
 putchar(10);
-*/
 
 type Foo {
 	i32 a,
@@ -86,8 +85,11 @@ foo.a = '9';
 putchar(foo.a);
 foo.doStuff(5);
 putchar(foo.a);
+*/
 
 a = [0, 48, 2];
 putchar(a[1]);
+a[2] = 49;
+putchar(a[2]);
 
 putchar(10);
