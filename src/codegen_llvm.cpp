@@ -111,6 +111,14 @@ namespace codegen {
 		// TODO ERROR
 	}
 
+	llvm::AllocaInst* alloc_var(const std::string& name, llvm::Type* type, llvm::Value* arrsize, CodeBlock* block) {
+		llvm::BasicBlock* entry = &module->llvmFunc->getEntryBlock();
+		llvm::IRBuilder<> builder(entry, entry->begin());
+		llvm::AllocaInst* alloc = builder.CreateAlloca(type, arrsize, name);
+		block->locals.insert(std::make_pair(name, alloc));
+		return alloc;
+	}
+
 	llvm::Value* find_var(std::string name, llvm::Value* parent, CodeBlock* block) {
 		if (parent) {
 			// Member variable
@@ -173,12 +181,15 @@ namespace codegen {
 
 			CodeBlock* parent = block;
 			block = new CodeBlock(parent);
-			for (llvm::Argument& arg : llvmfunc->args()) {
-				block->locals.insert(std::make_pair((std::string)arg.getName(), (llvm::AllocaInst*) & arg));
-			}
 
 			llvm::BasicBlock* entry = llvm::BasicBlock::Create(context, "entry", llvmfunc);
 			builder.SetInsertPoint(entry);
+
+			for (llvm::Argument& arg : llvmfunc->args()) {
+				llvm::AllocaInst* alloc = alloc_var(arg.getName(), arg.getType(), nullptr, block);
+				builder.CreateStore(&arg, alloc, false);
+				block->locals.insert(std::make_pair((std::string)arg.getName(), alloc));
+			}
 
 			gen_expr(func->body);
 			builder.CreateRet(builder.getInt32(0));
@@ -191,14 +202,6 @@ namespace codegen {
 		}
 
 		return llvmfunc;
-	}
-
-	llvm::AllocaInst* alloc_var(const std::string& name, llvm::Type* type, llvm::Value* arrsize, CodeBlock* block) {
-		llvm::BasicBlock* entry = &module->llvmFunc->getEntryBlock();
-		llvm::IRBuilder<> builder(entry, entry->begin());
-		llvm::AllocaInst* alloc = builder.CreateAlloca(type, arrsize, name);
-		block->locals.insert(std::make_pair(name, alloc));
-		return alloc;
 	}
 
 	/*
@@ -283,13 +286,27 @@ namespace codegen {
 		// Function call
 		llvm::Value* callee = gen_expr(call->func);
 		std::vector<llvm::Value*> args;
+		int i = 0;
+		for (llvm::Argument& arg : ((llvm::Function*)callee)->args()) {
+			if (call->func->type == "member") {
+				llvm::Value* val = i == 0 ? lastobject : cast(rval(gen_expr(call->args[i - 1]), call->args[i - 1]->lvalue()), arg.getType());
+				args.push_back(val);
+			}
+			else {
+				llvm::Value* val = cast(rval(gen_expr(call->args[i]), call->args[i]->lvalue()), arg.getType());
+				args.push_back(val);
+			}
+			i++;
+		}
+		/*
 		for (int i = 0; i < call->args.size(); i++) {
-			llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + i * sizeof(llvm::Argument*);
+			llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + (i + (call->func->type == "member" ? 1 : 0)) * sizeof(llvm::Argument*);
 			args.push_back(cast(rval(gen_expr(call->args[i]), call->args[i]->lvalue()), arg->getType()));
 		}
 		if (call->func->type == "member") {
 			args.insert(args.begin(), lastobject);
 		}
+		*/
 		return builder.CreateCall(callee, args);
 	}
 

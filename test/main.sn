@@ -77,17 +77,14 @@ type Foo {
 	i32 b;
 
 	def doStuff(i32 num) {
-		this.a -= num;
-		putchar('0');
-		putchar('1');
-		putchar('2');
+		(*this).a -= num;
 	}
 };
 
 foo = Foo();
-foo.a = 'Z';
+foo.a = '9';
 putchar(foo.a);
-foo.doStuff(2);
+foo.doStuff(5);
 putchar(foo.a);
 
 putchar(10);
