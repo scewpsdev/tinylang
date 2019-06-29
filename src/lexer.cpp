@@ -54,7 +54,12 @@ namespace lexer {
 		while (!input->eof()) {
 			char ch = input->next();
 			if (esc) {
-				str << ch;
+				switch (ch) {
+				case 'n': str << '\n'; break;
+				case 't': str << '\t'; break;
+				case '0': str << '\0'; break;
+				default: break;
+				}
 				esc = false;
 			}
 			else if (ch == '\\')
@@ -71,7 +76,10 @@ namespace lexer {
 	}
 
 	Token read_number() {
-		std::string numstr = read_while([](char ch) -> bool { return std::isdigit(ch) || ch == '-'; });
+		bool dot = false;
+		std::string numstr = read_while([](char ch) -> bool {
+			return std::isdigit(ch) || ch == '-' || ch == '.';
+		});
 		return { "num", numstr };
 	}
 

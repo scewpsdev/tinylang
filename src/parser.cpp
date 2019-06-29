@@ -97,8 +97,8 @@ namespace parser {
 		Token nametok = input->next();
 		if (nametok.type != "var") input->error("Type name expected");
 		type.name = nametok.value;
-		if (is_punc('*')) {
-			skip_punc('*');
+		if (is_op("*")) {
+			skip_op("*");
 			type.pointer = true;
 		}
 		return type;
@@ -201,7 +201,7 @@ namespace parser {
 			if (first->type != "num") {
 				// TODO ERROR
 			}
-			int numits = ((Number*)first)->value;
+			int numits = ((Number*)first)->i;
 			return new Loop(new Assign("=", new Identifier("__it"), new Number(0)), new Unary("++", true, new Identifier("__it")), new Binary("<", new Identifier("__it"), new Number(numits)), body);
 		}
 		if (first && second && !third) {
@@ -212,20 +212,20 @@ namespace parser {
 				// TODO ERROR
 			}
 			std::string itname = ((Identifier*)first)->value;
-			int numits = ((Number*)second)->value;
+			int numits = ((Number*)second)->i;
 			return new Loop(new Assign("=", new Identifier(itname), new Number(0)), new Unary("++", true, new Identifier(itname)), new Binary("<", new Identifier(itname), new Number(numits)), body);
 		}
 		if (first && second && third && !fourth) {
 			std::string itname = ((Identifier*)first)->value;
-			int start = ((Number*)second)->value;
-			int numits = ((Number*)third)->value;
+			int start = ((Number*)second)->i;
+			int numits = ((Number*)third)->i;
 			return new Loop(new Assign("=", new Identifier(itname), new Number(start)), new Unary("++", true, new Identifier(itname)), new Binary("<", new Identifier(itname), new Number(numits)), body);
 		}
 		if (first && second && third && fourth) {
 			std::string itname = ((Identifier*)first)->value;
-			int start = ((Number*)second)->value;
-			int numits = ((Number*)third)->value;
-			int step = ((Number*)fourth)->value;
+			int start = ((Number*)second)->i;
+			int numits = ((Number*)third)->i;
+			int step = ((Number*)fourth)->i;
 			return new Loop(new Assign("=", new Identifier(itname), new Number(0)), new Assign("+=", new Identifier(itname), new Number(step)), new Binary("<", new Identifier(itname), new Number(numits)), body);
 		}
 		else {
@@ -319,7 +319,7 @@ namespace parser {
 			if (tok.value == "continue") return new Continue();
 		}
 		if (tok.type == "var") return new Identifier(tok.value);
-		if (tok.type == "num") return new Number(std::stoi(tok.value));
+		if (tok.type == "num") return new Number(tok.value);
 		if (tok.type == "char") return new Character((int)tok.value[0]);
 		if (tok.type == "str") return new String(tok.value);
 		unexpected();

@@ -11,10 +11,27 @@ public:
 
 class Number : public Expression {
 public:
-	int value;
+	bool fpoint;
+	union {
+		int i;
+		float f;
+	};
 public:
 	Number(int value)
-		: Expression("num"), value(value) {}
+		: Expression("num"), fpoint(false), i(value) {}
+	Number(float value)
+		: Expression("num"), fpoint(true), f(value) {}
+	Number(const std::string& value)
+		: Expression("num") {
+		if (std::find(value.begin(), value.end(), '.') != value.end()) {
+			fpoint = true;
+			f = std::stof(value);
+		}
+		else {
+			i = std::stoi(value);
+			fpoint = false;
+		}
+	}
 };
 
 class Character : public Expression {

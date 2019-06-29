@@ -7,16 +7,17 @@
 	TODO
 	//- while loops
 	//- references
-	- arrays
+	//- arrays
 	//- structs
-	- strings
+	//- strings
 	//- for loops
 	- modules
-	- floats
+	//- floats
 	- hex, binary literals
 */
 
 ext putchar(i32 char);
+ext printf(i8* str);
 
 /*
 def func(i32 arg) {
@@ -91,5 +92,12 @@ a = [0, 48, 2];
 putchar(a[1]);
 a[2] = 49;
 putchar(a[2]);
+printf("\thello world\n");
 
-putchar(10);
+f = 0.5;
+f += 0.7;
+i = <i32>(f);
+i += 48;
+putchar(i);
+
+putchar('\n');

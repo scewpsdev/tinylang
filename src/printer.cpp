@@ -15,11 +15,12 @@ namespace printer {
 	}
 
 	void print_num(Number* num, std::ostream& out) {
-		out << std::to_string(num->value);
+		out << num->fpoint ? std::to_string(num->f) : std::to_string(num->i);
 	}
 
 	void print_char(Character* ch, std::ostream& out) {
-		out << '\'' << (wchar_t)ch->value << '\'';
+		char* ptr = (char*)(&ch->value);
+		out << '\'' << ptr << '\'';
 	}
 
 	void print_str(String* str, std::ostream& out) {

@@ -98,6 +98,8 @@ namespace codegen {
 	llvm::Value* cast(llvm::Value* val, llvm::Type* type) {
 		if (val->getType() == type) return val;
 		if (val->getType()->isIntegerTy() && type->isIntegerTy()) return builder.CreateSExtOrTrunc(val, type);
+		if (val->getType()->isIntegerTy() && type->isFloatingPointTy()) return builder.CreateSIToFP(val, type);
+		if (val->getType()->isFloatingPointTy() && type->isIntegerTy()) return builder.CreateFPToSI(val, type);
 		// TODO ERROR
 		return nullptr;
 	}
@@ -204,26 +206,16 @@ namespace codegen {
 		return llvmfunc;
 	}
 
-	/*
-	llvm::Value* call_func(const std::string& name, std::vector<llvm::Value*> args, CodeBlock* block) {
-		llvm::Value* callee = nullptr;
-		if (callee = find_var(name, block));
-		else callee = find_var(mangle(name, args), block);
-		if (!callee);// TODO ERROR
-		if (callee->getType()->isFunctionTy()) {
-			llvm::Function* func = static_cast<llvm::Function*>(callee);
-			return builder.CreateCall(func, args);
-		}
-		// TODO ERROR
-		return nullptr;
-	}
-	*/
-
 	void gen_core_defs() {
 	}
 
 	llvm::Value* gen_num(Number* num) {
-		return builder.getInt32(num->value);
+		if (num->fpoint) {
+			return llvm::ConstantFP::get(context, llvm::APFloat(num->f));
+		}
+		else {
+			return builder.getInt32(num->i);
+		}
 	}
 
 	llvm::Value* gen_char(Character* ch) {
@@ -231,7 +223,7 @@ namespace codegen {
 	}
 
 	llvm::Value* gen_str(String* str) {
-		return nullptr;
+		return builder.CreateGlobalStringPtr(str->value);
 	}
 
 	llvm::Value* gen_bool(Boolean* boolexpr) {
@@ -257,7 +249,6 @@ namespace codegen {
 			builder.CreateStore(elements[i], elementptr, false);
 		}
 		return alloc;
-		//return builder.CreateLoad(alloc);
 	}
 
 	llvm::Value* gen_closure(Closure* cls) {
@@ -293,15 +284,6 @@ namespace codegen {
 			}
 			i++;
 		}
-		/*
-		for (int i = 0; i < call->args.size(); i++) {
-			llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + (i + (call->func->type == "member" ? 1 : 0)) * sizeof(llvm::Argument*);
-			args.push_back(cast(rval(gen_expr(call->args[i]), call->args[i]->lvalue()), arg->getType()));
-		}
-		if (call->func->type == "member") {
-			args.insert(args.begin(), lastobject);
-		}
-		*/
 		return builder.CreateCall(callee, args);
 	}
 
@@ -322,30 +304,6 @@ namespace codegen {
 		llvm::Value* memberptr = gen_expr(member->member);
 		object = nullptr;
 		return memberptr;
-		/*
-		if (member->member->type == "var") {
-			std::string membername = ((Identifier*)member->member)->value;
-			return builder.CreateGEP(expr, { builder.getInt32(0), builder.getInt32(member_index(expr->getType()->getPointerElementType(), membername)) });
-		}
-		*/
-		/*
-		else if (member->member->type == "call") {
-			Call* call = (Call*)member->member;
-			llvm::Type* structtype = expr->getType()->getPointerElementType();
-			StructInfo* info = find_struct_info(structtype);
-			llvm::Value* callee = find_method(structtype, call.)
-				std::vector<llvm::Value*> args;
-			for (int i = 0; i < call->args.size(); i++) {
-				llvm::Argument* arg = ((llvm::Function*)callee)->arg_begin() + i * sizeof(llvm::Argument*);
-				args.push_back(cast(rval(gen_expr(call->args[i]), call->args[i]->lvalue()), arg->getType()));
-			}
-			return builder.CreateCall(callee, args);
-		}
-		*/
-		//else {
-		// TODO ERROR
-		//return nullptr;
-		//}
 	}
 
 	llvm::Value* gen_cast(Cast* c) {
@@ -457,12 +415,29 @@ namespace codegen {
 			if (op == "!=") return builder.CreateICmpNE(left, right);
 			if (op == "<") return builder.CreateICmpSLT(left, right);
 			if (op == ">") return builder.CreateICmpSGT(left, right);
-			if (op == "<=") return builder.CreateICmpEQ(left, right);
+			if (op == "<=") return builder.CreateICmpSLE(left, right);
 			if (op == ">=") return builder.CreateICmpSGE(left, right);
 			if (op == "&&") return builder.CreateAnd(left, right);
 			if (op == "||") return builder.CreateOr(left, right);
 		}
-		//return call_func(op, { left, right }, block);
+		if (left->getType()->isFloatingPointTy() && right->getType()->isFloatingPointTy()
+			|| left->getType()->isFloatingPointTy() && right->getType()->isIntegerTy()
+			|| left->getType()->isIntegerTy() && right->getType()->isFloatingPointTy()) {
+			llvm::Type* type = builder.getFloatTy();
+			left = cast(left, type);
+			right = cast(right, type);
+			if (op == "+") return builder.CreateFAdd(left, right);
+			if (op == "-") return builder.CreateFSub(left, right);
+			if (op == "*") return builder.CreateFMul(left, right);
+			if (op == "/") return builder.CreateFDiv(left, right);
+			if (op == "%") return builder.CreateFRem(left, right);
+			if (op == "==") return builder.CreateFCmpOEQ(left, right);
+			if (op == "!=") return builder.CreateFCmpONE(left, right);
+			if (op == "<") return builder.CreateFCmpOLT(left, right);
+			if (op == ">") return builder.CreateFCmpOGT(left, right);
+			if (op == "<=") return builder.CreateFCmpOLE(left, right);
+			if (op == ">=") return builder.CreateFCmpOGE(left, right);
+		}
 		// TODO ERROR
 		return nullptr;
 	}
